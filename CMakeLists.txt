@@ -37,7 +37,6 @@ set(ntiger_source_files
 	src/tree/tree_infrastructure.cpp
 	src/tree/tree_compute.cpp
 	src/tree/tree_gravity.cpp
-	src/tree/tree_hydro.cpp
 	src/tree/tree_particles.cpp
 	src/tree/tree_stats.cpp
 )

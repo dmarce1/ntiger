@@ -46,12 +46,7 @@ inline real W(real r, real h) {
 }
 
 inline real grav_force(real r, real h) {
-	h /= 1000.0;
-	if (r < h) {
-		return -r / (h * h * h);
-	} else {
-		return -1.0 / (r * r);
-	}
+	return -1.0 / (r * r);
 }
 
 inline real bspline(real r) {

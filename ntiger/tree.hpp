@@ -84,7 +84,7 @@ public:
 	void apply_gravity(fixed_real, fixed_real);
 	mass_attr compute_mass_attributes();
 	void compute_drift(fixed_real);
-	void compute_gravity(std::vector<hpx::id_type>, std::vector<mass_attr>, fixed_real, fixed_real);
+	void compute_gravity(std::vector<hpx::id_type>, std::vector<mass_attr>, fixed_real, fixed_real, bool self_call);
 	fixed_real compute_timestep(fixed_real);
 	void compute_interactions(fixed_real, fixed_real);
 	int compute_workload();

@@ -108,7 +108,10 @@ fixed_real tree::compute_timestep(fixed_real t) {
 				pi.dt = fixed_real::max();
 				const auto a = abs(pi.g);
 				if (a > 0.0) {
-					pi.dt = double(min(pi.dt, fixed_real(sqrt(pi.h / a).get())));
+					const real this_dt = sqrt(pi.h / a);
+					if (this_dt < (double) fixed_real::max()) {
+						pi.dt = double(min(pi.dt, fixed_real(this_dt.get())));
+					}
 				}
 				for (const auto &pj : parts) {
 					const auto dx = pi.x - pj.x;
@@ -117,7 +120,7 @@ fixed_real tree::compute_timestep(fixed_real t) {
 						const real vsig = (-min(0.0, (pi.vf - pj.vf).dot(dx) / r));
 						if (vsig > 0.0) {
 							const real this_dt = r / vsig;
-							if (this_dt.get() < (double) fixed_real::max() ) {
+							if (this_dt.get() < (double) fixed_real::max()) {
 								pi.dt = min(pi.dt, fixed_real(this_dt.get()));
 							}
 						}

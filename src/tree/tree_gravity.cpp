@@ -3,7 +3,8 @@
 #include <ntiger/profiler.hpp>
 #include <ntiger/tree.hpp>
 
-constexpr real G = 6.67259e-8;
+//constexpr real G = 6.67259e-8;
+constexpr real G = 1;
 
 void tree::apply_gravity(fixed_real t, fixed_real dt) {
 	//PROFILE();

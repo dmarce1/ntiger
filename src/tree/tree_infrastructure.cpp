@@ -245,20 +245,6 @@ hpx::id_type tree::get_parent() const {
 	return parent;
 }
 
-void tree::initialize(const std::string &init_name) {
-	if (leaf) {
-		const auto f = get_initialization_function(init_name);
-		for (auto &pi : parts) {
-			f(pi);
-		}
-	} else {
-		std::array<hpx::future<void>, NCHILD> futs;
-		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < initialize_action > (children[ci], init_name);
-		}
-		hpx::wait_all(futs);
-	}
-}
 
 hpx::id_type tree::migrate(const hpx::id_type &loc) {
 	auto id_fut = hpx::new_ < tree > (loc, parts, children, child_loads, root_box, box, leaf);

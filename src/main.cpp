@@ -1,4 +1,5 @@
 #include <hpx/hpx_init.hpp>
+#include <ntiger/initialize.hpp>
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
 #include <ntiger/tree.hpp>
@@ -7,9 +8,6 @@ hpx::id_type root;
 
 void solve_gravity(fixed_real t, fixed_real dt) {
 	static const auto opts = options::get();
-	if (opts.problem == "kepler" || opts.problem == "rt") {
-		tree::set_problem_force_action()(root);
-	}
 	if(opts.gravity) {
 		tree::compute_mass_attributes_action()(root);
 		tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt);
@@ -36,9 +34,6 @@ void init(fixed_real t, bool t0) {
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
 	tree::form_tree_action()(root, std::vector < hpx::id_type > (1, root), true);
 	tree::compute_interactions_action()(root, t, 0.0);
-	if (t0) {
-		tree::initialize_action()(root, opts.problem);
-	}
 }
 
 void write_checkpoint(int i, fixed_real t) {
@@ -91,18 +86,7 @@ int hpx_main(int argc, char *argv[]) {
 		}
 		t0 = false;
 	} else {
-//	std::vector<particle> parts = random_particle_set(N * N);
-		if (opts.problem == "kepler") {
-			parts = disc_particle_set(opts.problem_size);
-//		} else if( opts.problem == "polytrope"){
-//			parts = spherical_particle_set(opts.problem_size);
-		} else {
-			parts = cartesian_particle_set(opts.problem_size);
-		}
-		t0 = true;
-		for (auto &p : parts) {
-			p.x = p.x * opts.grid_size;
-		}
+		parts = get_initial_particles(opts.problem, opts.problem_size);
 	}
 	range box;
 	for (int dim = 0; dim < NDIM; dim++) {

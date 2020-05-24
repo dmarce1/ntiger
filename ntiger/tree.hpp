@@ -103,7 +103,6 @@ public:
 	void get_neighbor_particles(enum bnd_ex_type);
 	std::vector<nesting_particle> get_nesting_particles(range, range) const;
 	std::vector<timestep_particle> get_timestep_particles(range, range) const;
-	void initialize(const std::string&);
 	void redistribute_workload(int, int);
 	void send_particles(const std::vector<particle>&);
 	void set_problem_force();
@@ -140,7 +139,6 @@ public:
 	HPX_DEFINE_COMPONENT_ACTION(tree,destroy);
 	HPX_DEFINE_COMPONENT_ACTION(tree,form_tree);
 	HPX_DEFINE_COMPONENT_ACTION(tree,get_neighbor_particles);
-	HPX_DEFINE_COMPONENT_ACTION(tree,initialize);
 	HPX_DEFINE_COMPONENT_ACTION(tree,finish_drift);
 	HPX_DEFINE_COMPONENT_ACTION(tree,compute_gravity);
 	HPX_DEFINE_COMPONENT_ACTION(tree,redistribute_workload);

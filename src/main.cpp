@@ -10,7 +10,7 @@ void solve_gravity(fixed_real t, fixed_real dt) {
 	static const auto opts = options::get();
 	if(opts.gravity) {
 		tree::compute_mass_attributes_action()(root);
-		tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt);
+		tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
 	}
 	if (opts.problem == "kepler" || opts.problem == "rt" || opts.gravity) {
 		tree::apply_gravity_action()(root, t, dt);

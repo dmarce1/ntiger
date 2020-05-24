@@ -44,7 +44,6 @@ set(ntiger_source_files
 
 set(check2silo_source_files
     src/silo.cpp
-    src/delaunay.cpp
 )
 
 set(common_header_files

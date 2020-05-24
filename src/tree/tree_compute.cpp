@@ -113,19 +113,19 @@ fixed_real tree::compute_timestep(fixed_real t) {
 						pi.dt = double(min(pi.dt, fixed_real(this_dt.get())));
 					}
 				}
-				for (const auto &pj : parts) {
-					const auto dx = pi.x - pj.x;
-					const auto r = abs(dx);
-					if (r > 0.0 && r < max(pi.h, pj.h)) {
-						const real vsig = (-min(0.0, (pi.vf - pj.vf).dot(dx) / r));
-						if (vsig > 0.0) {
-							const real this_dt = r / vsig;
-							if (this_dt.get() < (double) fixed_real::max()) {
-								pi.dt = min(pi.dt, fixed_real(this_dt.get()));
-							}
-						}
-					}
-				}
+//				for (const auto &pj : parts) {
+//					const auto dx = pi.x - pj.x;
+//					const auto r = abs(dx);
+//					if (r > 0.0 && r < max(pi.h, pj.h)) {
+//						const real vsig = (-min(0.0, (pi.vf - pj.vf).dot(dx) / r));
+//						if (vsig > 0.0) {
+//							const real this_dt = r / vsig;
+//							if (this_dt.get() < (double) fixed_real::max()) {
+//								pi.dt = min(pi.dt, fixed_real(this_dt.get()));
+//							}
+//						}
+//					}
+//				}
 				pi.dt *= opts.cfl;
 				pi.dt = pi.dt.nearest_log2();
 				pi.dt = min(pi.dt, t.next_bin() - t);

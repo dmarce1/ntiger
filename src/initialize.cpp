@@ -19,7 +19,7 @@ std::vector<particle> kepler(int cnt) {
 			const auto rsqrrinv = 1.0 / (r * sqrt(r));
 			auto &p = parts[i];
 			if (r < 0.5 && r > 0.1) {
-				p.m0 = 1.0e-20;
+				p.m0 = 0.0;
 				p.x[0] = x;
 				p.x[1] = y;
 				p.vf[0] = -y * rsqrrinv;

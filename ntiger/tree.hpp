@@ -105,7 +105,6 @@ public:
 	std::vector<timestep_particle> get_timestep_particles(range, range) const;
 	void redistribute_workload(int, int);
 	void send_particles(const std::vector<particle>&);
-	void set_problem_force();
 	void set_self_and_parent(const hpx::id_type, const hpx::id_type);
 	tree_stats tree_statistics() const;
 	void write_checkpoint(const std::string&, fixed_real) const;
@@ -142,7 +141,6 @@ public:
 	HPX_DEFINE_COMPONENT_ACTION(tree,finish_drift);
 	HPX_DEFINE_COMPONENT_ACTION(tree,compute_gravity);
 	HPX_DEFINE_COMPONENT_ACTION(tree,redistribute_workload);
-	HPX_DEFINE_COMPONENT_ACTION(tree,set_problem_force);
 	HPX_DEFINE_COMPONENT_ACTION(tree,tree_statistics);
 	HPX_DEFINE_COMPONENT_ACTION(tree,write_checkpoint);
 	HPX_DEFINE_COMPONENT_ACTION(tree,write_silo);

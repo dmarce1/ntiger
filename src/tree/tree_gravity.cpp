@@ -40,18 +40,21 @@ mass_attr tree::compute_mass_attributes() {
 	mass.leaf = leaf;
 	if (leaf) {
 		//PROFILE();
+		Xcom = range_center(box);
+		rmaxb = 0.0;
 		if (parts.size()) {
 			for (const auto &p : parts) {
 				Xcom = Xcom + p.x * p.m0;
 				mtot += p.m0;
 			}
-			Xcom = Xcom / mtot;
-			for (const auto &p : parts) {
-				rmaxb = max(rmaxb, abs(p.x - Xcom));
+			if( mtot != 0.0 ) {
+				Xcom = Xcom / mtot;
 			}
-		} else {
-			Xcom = range_center(box);
-			rmaxb = 0.0;
+			for (const auto &p : parts) {
+				if( p.m0 != 0.0 ) {
+					rmaxb = max(rmaxb, abs(p.x - Xcom));
+				}
+			}
 		}
 	} else {
 		std::array<hpx::future<mass_attr>, NCHILD> futs;
@@ -218,31 +221,5 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			cfuts[ci] = hpx::async < compute_gravity_action > (children[ci], nids, masses, t, dt);
 		}
 		hpx::wait_all(cfuts);
-	}
-}
-
-void tree::set_problem_force() {
-	//PROFILE();
-	static const auto opts = options::get();
-	static const auto eps = opts.kep_eps;
-	if (leaf) {
-		if (opts.problem == "kepler") {
-			for (auto &p : parts) {
-				constexpr auto r0 = 0.05;
-				const auto r = abs(p.x);
-				p.g = -p.x * pow(r * r + eps * eps, -1.5);
-			}
-		} else {
-			for (auto &p : parts) {
-				p.g = vect(0);
-				p.g[1] = -0.5;
-			}
-		}
-	} else {
-		std::array<hpx::future<void>, NCHILD> futs;
-		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < set_problem_force_action > (children[ci]);
-		}
-		hpx::wait_all(futs);
 	}
 }

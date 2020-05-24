@@ -44,13 +44,13 @@ fixed_real timestep(fixed_real t) {
 	static const auto opts = options::get();
 	tree::get_neighbor_particles_action()(root, tree::TIMESTEP);
 	fixed_real dt = tree::compute_timestep_action()(root, t);
-	if (!opts.global_time) {
-		bool rc;
-		do {
-			tree::get_neighbor_particles_action()(root, tree::NESTING);
-			rc = tree::adjust_timesteps_action()(root, t, 2);
-		} while (rc);
-	}
+//	if (!opts.global_time) {
+//		bool rc;
+//		do {
+//			tree::get_neighbor_particles_action()(root, tree::NESTING);
+//			rc = tree::adjust_timesteps_action()(root, t, 2);
+//		} while (rc);
+//	}
 	return dt;
 }
 

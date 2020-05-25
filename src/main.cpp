@@ -96,6 +96,9 @@ int hpx_main(int argc, char *argv[]) {
 	root = hpx::new_ < tree > (hpx::find_here(), std::move(parts), box, null_range()).get();
 	init(t, t0);
 	solve_gravity(t, 0.0, false);
+	if (opts.problem == "plummer") {
+		tree::virialize_action()(root);
+	}
 	fixed_real dt = timestep(t);
 	write_checkpoint(0, t);
 	int oi = 0;

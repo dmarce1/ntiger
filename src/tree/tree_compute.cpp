@@ -2,6 +2,7 @@
 #include <ntiger/tree.hpp>
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
+#include <ntiger/rand.hpp>
 
 #include <hpx/synchronization/mutex.hpp>
 
@@ -109,3 +110,18 @@ fixed_real tree::compute_timestep(fixed_real t) {
 	}
 	return tmin;
 }
+
+void tree::virialize() {
+	if (leaf) {
+		for (auto &p : parts) {
+			p.v = rand_unit_vect()* sqrt(-p.phi/2.0);
+		}
+	} else {
+		std::array<hpx::future<void>, NCHILD> futs;
+		for (int ci = 0; ci < NCHILD; ci++) {
+			futs[ci] = hpx::async < virialize_action > (children[ci].id);
+		}
+		hpx::wait_all(futs);
+	}
+}
+

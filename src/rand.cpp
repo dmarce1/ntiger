@@ -34,5 +34,5 @@ vect rand_unit_vect() {
 real rand_normal() {
 	const auto u1 = rand1();
 	const auto u2 = rand1();
-	return sqrt(-log(u1)) * cos(2.0 * M_PI * u2);
+	return sqrt(-2.0*log(u1)) * cos(2.0 * M_PI * u2);
 }

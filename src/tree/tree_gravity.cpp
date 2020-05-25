@@ -6,23 +6,39 @@
 //constexpr real G = 6.67259e-8;
 constexpr real G = 1;
 
-void tree::apply_gravity(fixed_real t, fixed_real dt) {
+void tree::apply_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 	//PROFILE();
 	const static auto opts = options::get();
+	const auto first_condition = [](fixed_real t0, fixed_real dt0, fixed_real t1, fixed_real dt1) {
+		return t0 == t1;
+	};
+	const auto second_condition = [](fixed_real t0, fixed_real dt0, fixed_real t1, fixed_real dt1) {
+		return t0 + dt0 == t1 + dt1;
+	};
+	const auto always = [](fixed_real t0, fixed_real dt0, fixed_real t1, fixed_real dt1) {
+		return true;
+	};
+	std::function<bool(fixed_real, fixed_real, fixed_real, fixed_real)> cond;
+	if (opts.global_time) {
+		cond = always;
+	} else if (first_kick) {
+		cond = first_condition;
+	} else {
+		cond = second_condition;
+	}
 	if (leaf) {
 		for (int i = 0; i < parts.size(); i++) {
 			auto &p = parts[i];
 			if (dt != fixed_real(0.0)) {
-				if (p.t + p.dt == t + dt || opts.global_time) {
-					const auto this_dt = opts.global_time ? dt : p.dt;
-					p.v = p.v + p.g * double(this_dt);
+				if (cond(p.t, p.dt, t, dt)) {
+					p.v = p.v + p.g * double(p.dt) * 0.5;
 				}
 			}
 		}
 	} else {
 		std::array<hpx::future<void>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < apply_gravity_action > (children[ci].id, t, dt);
+			futs[ci] = hpx::async < apply_gravity_action > (children[ci].id, t, dt, first_kick);
 		}
 		hpx::wait_all(futs);
 	}

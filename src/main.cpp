@@ -6,14 +6,14 @@
 
 hpx::id_type root;
 
-void solve_gravity(fixed_real t, fixed_real dt) {
+void solve_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 	static const auto opts = options::get();
-	if (opts.gravity) {
+	if (opts.gravity || !first_kick) {
 		tree::compute_mass_attributes_action()(root);
 		tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
 	}
 	if (opts.problem == "kepler" || opts.problem == "rt" || opts.gravity) {
-		tree::apply_gravity_action()(root, t, dt);
+		tree::apply_gravity_action()(root, t, dt, first_kick);
 	}
 }
 
@@ -103,7 +103,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	root = hpx::new_ < tree > (hpx::find_here(), std::move(parts), box, null_range()).get();
 	init(t, t0);
-	solve_gravity(t, 0.0);
+	solve_gravity(t, 0.0, false);
 //	tree::get_neighbor_particles_action()(root, tree::PRIMITIVE);
 //	tree::set_drift_velocity_action()(root, t);
 	fixed_real dt = timestep(t);
@@ -119,11 +119,11 @@ int hpx_main(int argc, char *argv[]) {
 		for (int dim = 0; dim < NDIM; dim++) {
 			printf("%e ", s.momentum[dim].get());
 		}
-		printf("ek = %e ep = %e ev = %e verr = %e etot = %e\n", s.ek.get(), s.ep.get(), s.ev.get(), s.ev.get() / s.ep.get(), s.ev.get() + s.ep.get());
-		drift(t, dt / fixed_real(2));
+		printf("ek = %e ep = %e ev = %e verr = %e etot = %e\n", s.ek.get(), s.ep.get(), s.ev.get(), s.ev.get() / (std::abs(s.ep.get())+1.0e-100), s.ev.get() + s.ep.get());
 		//	rescale();
-		solve_gravity(t, dt);
-		drift(t, dt / fixed_real(2));
+		solve_gravity(t, dt, true);
+		drift(t, dt);
+		solve_gravity(t, dt, false);
 		t += dt;
 		tree::advance_time_action()(root, t);
 		if (int((last_output / fixed_real(opts.output_freq))) != int(((t / fixed_real(opts.output_freq))))) {

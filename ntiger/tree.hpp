@@ -79,7 +79,7 @@ public:
 	tree( const std::vector<particle>& _parts, const std::array<node_attr, NCHILD>& _children, const std::array<int, NCHILD>& _child_loads, const range& _root_box, const range& _box, bool _leaf );
 	tree(std::vector<particle>&&, const range&, const range&);
 
-	void apply_gravity(fixed_real, fixed_real);
+	void apply_gravity(fixed_real, fixed_real, bool);
 	mass_attr compute_mass_attributes();
 	void compute_drift(fixed_real);
 	void compute_gravity(std::vector<hpx::id_type>, std::vector<mass_attr>, fixed_real, fixed_real, bool self_call);

@@ -78,7 +78,7 @@ fixed_real tree::compute_timestep(fixed_real t) {
 	fixed_real tmin = fixed_real::max();
 	if (leaf) {
 		PROFILE();
-		for (int i = 0; i < nparts0; i++) {
+		for (int i = 0; i < parts.size(); i++) {
 			auto &pi = parts[i];
 			if (pi.t + pi.dt == t || opts.global_time) {
 				pi.t += pi.dt;
@@ -98,7 +98,6 @@ fixed_real tree::compute_timestep(fixed_real t) {
 				tmin = min(tmin, pi.dt);
 			}
 		}
-		parts.resize(nparts0);
 	} else {
 		std::array<hpx::future<fixed_real>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
@@ -114,12 +113,31 @@ fixed_real tree::compute_timestep(fixed_real t) {
 void tree::virialize() {
 	if (leaf) {
 		for (auto &p : parts) {
-			p.v = rand_unit_vect()* sqrt(-p.phi/2.0);
+			p.v = rand_unit_vect() * sqrt(-p.phi / 2.0) * rand_normal();
 		}
 	} else {
 		std::array<hpx::future<void>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
 			futs[ci] = hpx::async < virialize_action > (children[ci].id);
+		}
+		hpx::wait_all(futs);
+	}
+}
+
+
+void tree::keplerize() {
+	if (leaf) {
+		for (auto &p : parts) {
+			const auto r = abs(p.x);
+			const auto g = abs(p.g);
+			p.v[0] = sqrt(g * r) * (-p.x[1]) / r;
+			p.v[1] = sqrt(g * r) * (+p.x[0]) / r;
+			p.v[2] = 0.0;
+		}
+	} else {
+		std::array<hpx::future<void>, NCHILD> futs;
+		for (int ci = 0; ci < NCHILD; ci++) {
+			futs[ci] = hpx::async < keplerize_action > (children[ci].id);
 		}
 		hpx::wait_all(futs);
 	}

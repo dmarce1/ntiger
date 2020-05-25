@@ -15,12 +15,26 @@ std::vector<particle> plummer(int cnt) {
 			r = abs(x);
 			rho = pow(1.0 + r * r, -5.0 / 2.0);
 		} while (rand1() > rho);
-	//	real dv = sqrt(1.0 / sqrt(r * r + 1.0) * (4.0 * M_PI / 3.0) * cnt / 4.0);
 		p[i].x = x;
-//		p[i].v = rand_unit_vect() * rand_normal() * dv;
-//		for (int dim = 0; dim < NDIM; dim++) {
-//			p[i].v[dim] = rand_normal() * dv;
-//		}
+		p[i].m = 1.0;
+	}
+	return p;
+}
+
+std::vector<particle> toomre1(int cnt) {
+	std::vector<particle> p(cnt);
+	real rmax = 5.0;
+	for (int i = 0; i < cnt; i++) {
+		vect x;
+		real rho;
+		real r;
+		do {
+			x = rand_unit_vect() * rmax * rand1();
+			r = sqrt(abs(x) * abs(x) - x[2] * x[2]);
+			rho = pow(1.0 + r * r, -3.0 / 2.0);
+			x[2] = rand_normal() * rand_sign() * 0.001;
+		} while (rand1() > rho);
+		p[i].x = x;
 		p[i].m = 1.0;
 	}
 	return p;
@@ -60,6 +74,8 @@ std::vector<particle> get_initial_particles(const std::string &name, int cnt) {
 	if (false) {
 	} else if (name == "kepler") {
 		return kepler(cnt);
+	} else if (name == "toomre") {
+		return toomre1(cnt);
 	} else if (name == "plummer") {
 		return plummer(cnt);
 	} else {

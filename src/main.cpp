@@ -98,6 +98,8 @@ int hpx_main(int argc, char *argv[]) {
 	solve_gravity(t, 0.0, false);
 	if (opts.problem == "plummer") {
 		tree::virialize_action()(root);
+	} else if (opts.problem == "toomre") {
+		tree::keplerize_action()(root);
 	}
 	fixed_real dt = timestep(t);
 	write_checkpoint(0, t);

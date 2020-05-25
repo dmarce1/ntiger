@@ -102,6 +102,7 @@ public:
 	void send_particles(const std::vector<particle>&);
 	void set_self_and_parent(const hpx::id_type, const hpx::id_type);
 	tree_stats tree_statistics() const;
+	void keplerize();
 	void virialize();
 	void write_checkpoint(const std::string&, fixed_real) const;
 	void write_silo(int, fixed_real) const;
@@ -139,6 +140,7 @@ public:
 	HPX_DEFINE_COMPONENT_ACTION(tree,write_checkpoint);
 	HPX_DEFINE_COMPONENT_ACTION(tree,write_silo);
 	HPX_DEFINE_COMPONENT_ACTION(tree,migrate);
+	HPX_DEFINE_COMPONENT_ACTION(tree,keplerize);
 	HPX_DEFINE_COMPONENT_ACTION(tree,virialize);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_scale_factor);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_attributes);

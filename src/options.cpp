@@ -31,10 +31,10 @@ bool options::process_options(int argc, char *argv[]) {
 
 		command_opts.add_options() //
 		("help", "produce help message") //
-		("cfl", po::value<double>(&cfl)->default_value(0.4), "CFL factor") //
+		("cfl", po::value<double>(&cfl)->default_value(0.03), "CFL factor") //
 		("checkpoint", po::value<std::string>(&checkpoint)->default_value(""), "checkpoint file") //
 		("config_file", po::value<std::string>(&config_file)->default_value(""), "configuration file") //
-		("kernel_size", po::value<double>(&kernel_size)->default_value(0.01), "softening length (0.01)") //
+		("kernel_size", po::value<double>(&kernel_size)->default_value(-1), "softening length (0.01)") //
 		("fgamma", po::value<double>(&fgamma)->default_value(7.0 / 5.0), "gamma for fluid gamma law") //
 		("fpe", po::value<bool>(&fpe)->default_value(true), "enable floating point exceptions") //
 		("global_time", po::value<bool>(&global_time)->default_value(false), "enable global time-stepping") //
@@ -68,6 +68,9 @@ bool options::process_options(int argc, char *argv[]) {
 
 		if (output_freq <= 0.0) {
 			output_freq = tmax / 100.0;
+		}
+		if( kernel_size <= 0 ) {
+			kernel_size = pow(problem_size,-1.0/3.0);
 		}
 
 //	}

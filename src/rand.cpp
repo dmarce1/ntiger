@@ -17,6 +17,14 @@ real rand1() {
 	return (rand() + 0.5) / (RAND_MAX + 1.0);
 }
 
+real rand_sign() {
+	if( rand() % 2 ) {
+		return +1.0;
+	} else {
+		return -1.0;
+	}
+}
+
 vect rand_unit_vect() {
 	vect n;
 	real sum = 0.0;

@@ -15,7 +15,6 @@ hpx::lcos::local::mutex tree::lost_parts_mtx;
 
 tree::tree() {
 	mtx = std::make_shared<hpx::lcos::local::mutex>();
-	nparts0 = 0;
 	dead = false;
 	leaf = false;
 }
@@ -30,11 +29,10 @@ tree::tree(const std::vector<particle> &_parts, const std::array<node_attr, NCHI
 	box = _box;
 	leaf = _leaf;
 	dead = false;
-	nparts0 = parts.size();
 }
 
 tree::tree(std::vector<particle> &&these_parts, const range &box_, const range &root_box_) :
-		box(box_), nparts0(0), dead(false), root_box(root_box_) {
+		box(box_), dead(false), root_box(root_box_) {
 	const int sz = these_parts.size();
 	static const auto opts = options::get();
 	const auto npart_max = opts.parts_per_node;
@@ -87,7 +85,6 @@ int tree::compute_workload() {
 
 void tree::create_children() {
 	leaf = false;
-	nparts0 = 0;
 	std::array<hpx::future<hpx::id_type>, NCHILD> futs;
 	range child_box;
 	for (int ci = 0; ci < NCHILD; ci++) {
@@ -189,8 +186,7 @@ tree_attr tree::finish_drift() {
 	if (leaf) {
 		parts.insert(parts.end(), new_parts.begin(), new_parts.end());
 		new_parts.clear();
-		nparts0 = parts.size();
-		if (nparts0 > npart_max) {
+		if (parts.size() > npart_max) {
 			create_children();
 		}
 	} else {
@@ -218,7 +214,6 @@ tree_attr tree::finish_drift() {
 				children[ci].id = hpx::invalid_id;
 				parts.insert(parts.end(), tmp.begin(), tmp.end());
 			}
-			nparts0 = parts.size();
 			leaf = true;
 		}
 	}
@@ -311,7 +306,6 @@ void tree::send_lost_parts(std::vector<particle> lost) {
 	}
 	if (leaf) {
 		parts.insert(parts.end(), lost.begin(), lost.end());
-		nparts0 = parts.size();
 	} else {
 		std::array<hpx::future<void>, NCHILD> futs;
 		std::vector<particle> cparts;
@@ -350,7 +344,6 @@ void tree::set_self_and_parent(const hpx::id_type s, const hpx::id_type p) {
 		}
 		hpx::wait_all(futs);
 	}
-	nparts0 = parts.size();
 }
 
 tree_stats tree::tree_statistics() const {

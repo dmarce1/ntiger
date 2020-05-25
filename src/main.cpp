@@ -8,7 +8,7 @@ hpx::id_type root;
 
 void solve_gravity(fixed_real t, fixed_real dt) {
 	static const auto opts = options::get();
-	if(opts.gravity) {
+	if (opts.gravity) {
 		tree::compute_mass_attributes_action()(root);
 		tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
 	}
@@ -25,15 +25,31 @@ void drift(fixed_real t, fixed_real dt) {
 	tree::redistribute_workload_action()(root, 0, s.nparts);
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
 	tree::form_tree_action()(root, std::vector < hpx::id_type > (1, root), true);
-	tree::compute_interactions_action()(root, t, dt);
+	tree::compute_interactions_action()(root);
 }
 
+void rescale() {
+	const auto new_scale = tree::compute_scale_factor_action()(root);
+	if (new_scale > 1.0) {
+		printf("Re-scaling by %e\n", new_scale.get());
+		tree::rescale_action()(root, new_scale, range());
+		tree::send_lost_parts_action()(root, std::vector<particle>());
+		tree::finish_drift_action()(root);
+		const auto s = tree::tree_statistics_action()(root);
+		tree::compute_workload_action()(root);
+		tree::redistribute_workload_action()(root, 0, s.nparts);
+		tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
+		tree::form_tree_action()(root, std::vector < hpx::id_type > (1, root), true);
+		tree::compute_interactions_action()(root);
+	}
+
+}
 
 void init(fixed_real t, bool t0) {
 	static const auto opts = options::get();
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
 	tree::form_tree_action()(root, std::vector < hpx::id_type > (1, root), true);
-	tree::compute_interactions_action()(root, t, 0.0);
+	tree::compute_interactions_action()(root);
 }
 
 void write_checkpoint(int i, fixed_real t) {
@@ -113,6 +129,7 @@ int hpx_main(int argc, char *argv[]) {
 		}
 		printf("Energy = %e\n", s.energy.get());
 		drift(t, dt / fixed_real(2));
+		rescale();
 		solve_gravity(t, dt);
 		drift(t, dt / fixed_real(2));
 		t += dt;

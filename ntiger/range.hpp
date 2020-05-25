@@ -24,6 +24,7 @@ struct range {
 range reflect_range(const range&, int dim, real axis);
 vect range_center(const range &r);
 range shift_range(const range& r, const vect&);
+range scale_range(const range& , real);
 vect range_span(const range&);
 bool in_range(const vect&, const range&);
 bool in_range(const range&, const range&);

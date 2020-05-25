@@ -22,7 +22,7 @@ void tree::apply_gravity(fixed_real t, fixed_real dt) {
 	} else {
 		std::array<hpx::future<void>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < apply_gravity_action > (children[ci], t, dt);
+			futs[ci] = hpx::async < apply_gravity_action > (children[ci].id, t, dt);
 		}
 		hpx::wait_all(futs);
 	}
@@ -61,7 +61,7 @@ mass_attr tree::compute_mass_attributes() {
 		std::array<hpx::future<mass_attr>, NCHILD> futs;
 		std::array<mass_attr, NCHILD> child_attr;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < compute_mass_attributes_action > (children[ci]);
+			futs[ci] = hpx::async < compute_mass_attributes_action > (children[ci].id);
 		}
 		for (int ci = 0; ci < NCHILD; ci++) {
 			child_attr[ci] = futs[ci].get();
@@ -222,7 +222,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			nids.insert(nids.end(), tmp.begin(), tmp.end());
 		}
 		for (int ci = 0; ci < NCHILD; ci++) {
-			cfuts[ci] = hpx::async < compute_gravity_action > (children[ci], nids, masses, t, dt, false);
+			cfuts[ci] = hpx::async < compute_gravity_action > (children[ci].id, nids, masses, t, dt, false);
 		}
 		hpx::wait_all(cfuts);
 	}

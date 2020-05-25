@@ -22,6 +22,15 @@ range reflect_range(const range &r_, int dim, real x) {
 	return r;
 }
 
+range scale_range(const range &r_, real s) {
+	range r;
+	for (int dim = 0; dim < NDIM; dim++) {
+		r.min[dim] = r_.min[dim] * s;
+		r.max[dim] = r_.max[dim] * s;
+	}
+	return r;
+}
+
 range shift_range(const range &r_, const vect &v) {
 	range r;
 	for (int dim = 0; dim < NDIM; dim++) {

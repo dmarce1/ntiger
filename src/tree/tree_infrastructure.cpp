@@ -2,9 +2,16 @@
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
 #include <ntiger/tree.hpp>
+
+#include  <hpx/lcos/when_all.hpp>
+#include <hpx/synchronization/mutex.hpp>
+
 #include <set>
 
 HPX_REGISTER_COMPONENT(hpx::components::component<tree>, tree);
+
+std::vector<particle> tree::lost_parts;
+hpx::lcos::local::mutex tree::lost_parts_mtx;
 
 tree::tree() {
 	mtx = std::make_shared<hpx::lcos::local::mutex>();
@@ -13,7 +20,7 @@ tree::tree() {
 	leaf = false;
 }
 
-tree::tree(const std::vector<particle> &_parts, const std::array<hpx::id_type, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads,
+tree::tree(const std::vector<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads,
 		const range &_root_box, const range &_box, bool _leaf) {
 	mtx = std::make_shared<hpx::lcos::local::mutex>();
 	parts = _parts;
@@ -67,7 +74,7 @@ int tree::compute_workload() {
 		load = 0;
 		std::array<hpx::future<int>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < compute_workload_action > (children[ci]);
+			futs[ci] = hpx::async < compute_workload_action > (children[ci].id);
 		}
 		for (int ci = 0; ci < NCHILD; ci++) {
 			const auto this_load = futs[ci].get();
@@ -98,6 +105,7 @@ void tree::create_children() {
 			}
 			m >>= 1;
 		}
+		children[ci].box = child_box;
 		int this_sz = parts.size();
 		std::vector<particle> child_parts;
 		for (int i = 0; i < this_sz; i++) {
@@ -115,7 +123,7 @@ void tree::create_children() {
 		}, std::move(child_parts));
 	}
 	for (int ci = 0; ci < NCHILD; ci++) {
-		children[ci] = futs[ci].get();
+		children[ci].id = futs[ci].get();
 	}
 }
 
@@ -124,6 +132,73 @@ std::vector<particle> tree::destroy() {
 	siblings.clear();
 	dead = true;
 	return parts;
+}
+
+void tree::find_home(const std::vector<particle> &pis, bool almost_home) {
+	std::vector < std::vector < particle >> send_parts(siblings.size());
+	std::vector<particle> self_parts;
+	std::vector<particle> parent_parts;
+
+	{
+		PROFILE();
+		bool found;
+		for (int i = 0; i < pis.size(); i++) {
+			const auto &pi = pis[i];
+			if (almost_home && in_range(pi.x, box)) {
+				self_parts.push_back(pi);
+			} else {
+				found = false;
+				for (int j = 0; j < siblings.size(); j++) {
+					if (in_range(pi.x, siblings[j].box)) {
+						send_parts[j].push_back(pi);
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					parent_parts.push_back(pi);
+				}
+			}
+
+		}
+	}
+	hpx::future<void> self_fut;
+	std::vector<hpx::future<void>> futs(siblings.size());
+	for (int j = 0; j < siblings.size(); j++) {
+		futs[j] = hpx::async < send_particles_action > (siblings[j].id, std::move(send_parts[j]));
+	}
+	if (self_parts.size()) {
+		if (leaf) {
+			self_fut = hpx::async < send_particles_action > (self, std::move(self_parts));
+		} else {
+			std::array<hpx::future<void>, NCHILD> cfuts;
+			for (int ci = 0; ci < NCHILD; ci++) {
+				std::vector<particle> cparts;
+				for (int i = 0; i < self_parts.size(); i++) {
+					if (in_range(self_parts[i].x, children[ci].box)) {
+						cparts.push_back(self_parts[i]);
+						self_parts[i] = self_parts[self_parts.size() - 1];
+						self_parts.resize(self_parts.size() - 1);
+					}
+				}
+				cfuts[ci] = hpx::async < find_home_action > (children[ci].id, std::move(cparts), true);
+			}
+			self_fut = hpx::when_all(cfuts);
+		}
+	} else {
+		self_fut = hpx::make_ready_future<void>();
+	}
+	if (parent != hpx::invalid_id) {
+		if( parent_parts.size() ) {
+			find_home_action()(parent, std::move(parent_parts), false);
+		}
+	} else if (parent_parts.size()) {
+		printf("%i parts left the grid\n", int(parent_parts.size()));
+		std::lock_guard < hpx::lcos::local::mutex > lock(lost_parts_mtx);
+		lost_parts.insert(lost_parts.end(), parent_parts.begin(), parent_parts.end());
+	}
+	self_fut.get();
+	hpx::wait_all(futs);
 }
 
 tree_attr tree::finish_drift() {
@@ -139,7 +214,7 @@ tree_attr tree::finish_drift() {
 	} else {
 		std::array<hpx::future<tree_attr>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < finish_drift_action > (children[ci]);
+			futs[ci] = hpx::async < finish_drift_action > (children[ci].id);
 		}
 		int cparts = 0;
 		bool all_leaves = true;
@@ -154,11 +229,11 @@ tree_attr tree::finish_drift() {
 		if (cparts <= npart_max && all_leaves) {
 			std::array < hpx::future<std::vector<particle>>, NCHILD > dfuts;
 			for (int ci = 0; ci < NCHILD; ci++) {
-				dfuts[ci] = hpx::async < destroy_action > (children[ci]);
+				dfuts[ci] = hpx::async < destroy_action > (children[ci].id);
 			}
 			for (int ci = 0; ci < NCHILD; ci++) {
 				const auto tmp = dfuts[ci].get();
-				children[ci] = hpx::invalid_id;
+				children[ci].id = hpx::invalid_id;
 				parts.insert(parts.end(), tmp.begin(), tmp.end());
 			}
 			nparts0 = parts.size();
@@ -189,7 +264,7 @@ void tree::form_tree(std::vector<hpx::id_type> nids, bool clear_sibs) {
 		const auto srange = attrs[i].box;
 		if (ranges_intersect(srange, box) && srange != box) {
 			if (attrs[i].leaf) {
-				siblings.push_back( { nids[i], attrs[i].box});
+				siblings.push_back( { nids[i], attrs[i].box });
 			} else {
 				if (used.find(nids[i]) == used.end() && nids[i] != self) {
 					cfuts.push_back(hpx::async < get_children_action > (nids[i]));
@@ -215,14 +290,16 @@ void tree::form_tree(std::vector<hpx::id_type> nids, bool clear_sibs) {
 			}
 		}
 		siblings.clear();
-		next_nids.insert(next_nids.end(), children.begin(), children.end());
+		for (const auto &c : children) {
+			next_nids.push_back(c.id);
+		}
 		for (auto &f : cfuts) {
 			const auto list = f.get();
 			next_nids.insert(next_nids.end(), list.begin(), list.end());
 		}
 		std::array<hpx::future<void>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < form_tree_action > (children[ci], next_nids, true);
+			futs[ci] = hpx::async < form_tree_action > (children[ci].id, next_nids, true);
 		}
 		hpx::wait_all(futs);
 	}
@@ -238,19 +315,56 @@ tree_attr tree::get_attributes() const {
 }
 
 std::array<hpx::id_type, NCHILD> tree::get_children() const {
-	return children;
+	std::array < hpx::id_type, NCHILD > cids;
+	for (int ci = 0; ci < NCHILD; ci++) {
+		cids[ci] = children[ci].id;
+	}
+	return cids;
 }
 
 hpx::id_type tree::get_parent() const {
 	return parent;
 }
 
-
 hpx::id_type tree::migrate(const hpx::id_type &loc) {
 	auto id_fut = hpx::new_ < tree > (loc, parts, children, child_loads, root_box, box, leaf);
 	auto id = id_fut.get();
 	dead = true;
 	return id;
+}
+
+void tree::rescale(real factor, range mybox) {
+	printf( "%e\n", factor);
+	if (parent == hpx::invalid_id) {
+		box = scale_range(box, factor);
+	} else {
+		box = mybox;
+	}
+	printf( "%e %e %e %e\n", box.min[0], box.max[0], box.min[1], box.max[1]);
+	std::array<hpx::future<void>, NCHILD> futs;
+	if (!leaf) {
+		range child_box;
+		for (int ci = 0; ci < NCHILD; ci++) {
+			int m = ci;
+			for (int dim = 0; dim < NDIM; dim++) {
+				const auto &b = box.min[dim];
+				const auto &e = box.max[dim];
+				const auto mid = (e + b) * 0.5;
+				if (m & 1) {
+					child_box.min[dim] = mid;
+					child_box.max[dim] = e;
+				} else {
+					child_box.min[dim] = b;
+					child_box.max[dim] = mid;
+				}
+				m >>= 1;
+			}
+			children[ci].box = child_box;
+			futs[ci] = hpx::async < rescale_action > (children[ci].id, factor, child_box);
+		}
+
+		hpx::wait_all(futs);
+	}
 }
 
 void tree::redistribute_workload(int current, int total) {
@@ -262,10 +376,36 @@ void tree::redistribute_workload(int current, int total) {
 			assert(loc_id >= 0);
 			assert(loc_id < localities.size());
 			if (localities[loc_id] != hpx::find_here()) {
-				children[ci] = migrate_action()(children[ci], localities[loc_id]);
+				children[ci].id = migrate_action()(children[ci].id, localities[loc_id]);
 			}
-			futs[ci] = hpx::async < redistribute_workload_action > (children[ci], current, total);
+			futs[ci] = hpx::async < redistribute_workload_action > (children[ci].id, current, total);
 			current += child_loads[ci];
+		}
+		hpx::wait_all(futs);
+	}
+}
+
+void tree::send_lost_parts(std::vector<particle> lost) {
+	if (parent == hpx::invalid_id) {
+		lost = lost_parts;
+		lost_parts.clear();
+	}
+	if (leaf) {
+		parts.insert(parts.end(), lost.begin(), lost.end());
+		nparts0 = parts.size();
+	} else {
+		std::array<hpx::future<void>, NCHILD> futs;
+		std::vector<particle> cparts;
+		for (int ci = 0; ci < NCHILD; ci++) {
+			for (int i = 0; i < lost.size(); i++) {
+				if (in_range(lost[i].x, children[ci].box)) {
+					cparts.push_back(lost[i]);
+					printf( "Found match\n");
+					lost[i] = lost[lost.size() - 1];
+					lost.resize(lost.size() - 1);
+				}
+			}
+			futs[ci] = hpx::async < send_lost_parts_action > (children[ci].id, std::move(cparts));
 		}
 		hpx::wait_all(futs);
 	}
@@ -278,9 +418,9 @@ void tree::set_self_and_parent(const hpx::id_type s, const hpx::id_type p) {
 	if (!leaf) {
 		std::array<hpx::future<void>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			assert(children[ci] != hpx::invalid_id);
-			auto this_p = children[ci];
-			futs[ci] = hpx::async < set_self_and_parent_action > (children[ci], std::move(this_p), self);
+			assert(children[ci].id != hpx::invalid_id);
+			auto this_p = children[ci].id;
+			futs[ci] = hpx::async < set_self_and_parent_action > (children[ci].id, std::move(this_p), self);
 		}
 		hpx::wait_all(futs);
 	}
@@ -306,7 +446,7 @@ tree_stats tree::tree_statistics() const {
 		stats.nleaves = 0;
 		std::array<hpx::future<tree_stats>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < tree_statistics_action > (children[ci]);
+			futs[ci] = hpx::async < tree_statistics_action > (children[ci].id);
 		}
 		for (int ci = 0; ci < NCHILD; ci++) {
 			tree_stats cstat = futs[ci].get();
@@ -339,7 +479,7 @@ void tree::write_checkpoint(const std::string &filename, fixed_real t) const {
 		fclose(fp);
 	} else {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			write_checkpoint_action()(children[ci], filename, t);
+			write_checkpoint_action()(children[ci].id, filename, t);
 		}
 	}
 }

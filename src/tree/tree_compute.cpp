@@ -3,6 +3,8 @@
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
 
+#include <hpx/synchronization/mutex.hpp>
+
 #if(NDIM == 1 )
 constexpr real CV = 2.0;
 constexpr int NNGB = 4;
@@ -31,12 +33,11 @@ void tree::advance_time(fixed_real t) {
 	} else {
 		std::array<hpx::future<void>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async<advance_time_action>(children[ci], t);
+			futs[ci] = hpx::async < advance_time_action > (children[ci].id, t);
 		}
 		hpx::wait_all(futs);
 	}
 }
-
 
 bool tree::adjust_timesteps(fixed_real t, int factor) {
 	static const auto opts = options::get();
@@ -68,7 +69,7 @@ bool tree::adjust_timesteps(fixed_real t, int factor) {
 	} else {
 		std::array<hpx::future<bool>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < adjust_timesteps_action > (children[ci], t, factor);
+			futs[ci] = hpx::async < adjust_timesteps_action > (children[ci].id, t, factor);
 		}
 		for (int ci = 0; ci < NCHILD; ci++) {
 			rc = rc || futs[ci].get();
@@ -81,20 +82,25 @@ void tree::compute_drift(fixed_real dt) {
 	static const auto opts = options::get();
 	if (leaf) {
 		std::vector < std::vector < particle >> send_parts(siblings.size());
+		std::vector<particle> parent_parts;
 		{
 			PROFILE();
 			int sz = parts.size();
+			bool found;
 			for (int i = 0; i < sz; i++) {
 				auto &pi = parts[i];
 				pi.x = pi.x + pi.vf * double(dt);
 				if (!in_range(pi.x, box)) {
-					bool found = false;
+					found = false;
 					for (int j = 0; j < siblings.size(); j++) {
 						if (in_range(pi.x, siblings[j].box)) {
 							send_parts[j].push_back(pi);
 							found = true;
 							break;
 						}
+					}
+					if (!found) {
+						parent_parts.push_back(pi);
 					}
 					sz--;
 					parts[i] = parts[sz];
@@ -107,15 +113,38 @@ void tree::compute_drift(fixed_real dt) {
 		for (int j = 0; j < siblings.size(); j++) {
 			futs[j] = hpx::async < send_particles_action > (siblings[j].id, std::move(send_parts[j]));
 		}
+		if (parent != hpx::invalid_id) {
+			if( parent_parts.size() ) {
+				find_home_action()(parent, std::move(parent_parts),false);
+			}
+		} else if (parent_parts.size()) {
+			std::lock_guard < hpx::lcos::local::mutex > lock(lost_parts_mtx);
+			lost_parts.insert(lost_parts.end(), parent_parts.begin(), parent_parts.end());
+		}
 		hpx::wait_all(futs);
 	} else {
 		std::array<hpx::future<void>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < compute_drift_action > (children[ci], dt);
+			futs[ci] = hpx::async < compute_drift_action > (children[ci].id, dt);
 		}
 		hpx::wait_all(futs);
 	}
 
+}
+
+real tree::compute_scale_factor() {
+	if (lost_parts.size()) {
+		real max_dim = 0.0;
+		real current_dim = box.max[0];
+		for (int i = 0; i < lost_parts.size(); i++) {
+			for (int dim = 0; dim < NDIM; dim++) {
+				max_dim = std::max(max_dim, abs(lost_parts[i].x[dim]));
+			}
+		}
+		return max_dim / current_dim * 1.1;
+	} else {
+		return 1.0;
+	}
 }
 
 fixed_real tree::compute_timestep(fixed_real t) {
@@ -158,7 +187,7 @@ fixed_real tree::compute_timestep(fixed_real t) {
 	} else {
 		std::array<hpx::future<fixed_real>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < compute_timestep_action > (children[ci], t);
+			futs[ci] = hpx::async < compute_timestep_action > (children[ci].id, t);
 		}
 		for (int ci = 0; ci < NCHILD; ci++) {
 			tmin = min(tmin, futs[ci].get());
@@ -167,7 +196,7 @@ fixed_real tree::compute_timestep(fixed_real t) {
 	return tmin;
 }
 
-void tree::compute_interactions(fixed_real t, fixed_real dt) {
+void tree::compute_interactions() {
 	const auto toler = NNGB * 10.0 * real::eps();
 	static auto opts = options::get();
 	nparts0 = parts.size();
@@ -260,48 +289,11 @@ void tree::compute_interactions(fixed_real t, fixed_real dt) {
 					}
 				}
 			}
-			{
-				PROFILE();
-				for (int i = 0; i < parts.size(); i++) {
-					auto &pi = parts[i];
-					if (pi.t + pi.dt == t + dt || opts.global_time) {
-						pi.V = 0.0;
-						for (const auto &pjx : pos) {
-							const auto r = abs(pi.x - pjx);
-							const auto h = pi.h;
-							if (r < h) {
-								pi.V += W(r, h);
-							}
-						}
-
-						pi.V = 1.0 / pi.V;
-						std::array<vect, NDIM> E, B;
-						for (int n = 0; n < NDIM; n++) {
-							E[n] = vect(0.0);
-						}
-						for (const auto &pjx : pos) {
-							const auto r = abs(pi.x - pjx);
-							const auto h = pi.h;
-							if (r < h) {
-								const auto psi_j = W(r, h) * pi.V;
-								for (int n = 0; n < NDIM; n++) {
-									for (int m = 0; m < NDIM; m++) {
-										E[n][m] += (pjx[n] - pi.x[n]) * (pjx[m] - pi.x[m]) * psi_j;
-									}
-								}
-							}
-						}
-
-						pi.Nc = condition_number(E, pi.B);
-						assert(pi.Nc != 0.0);
-					}
-				}
-			}
 		}
 	} else {
 		std::array<hpx::future<void>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < compute_interactions_action > (children[ci], t, dt);
+			futs[ci] = hpx::async < compute_interactions_action > (children[ci].id);
 		}
 		hpx::wait_all(futs);
 	}

@@ -68,7 +68,7 @@ void tree::get_neighbor_particles(tree::bnd_ex_type type) {
 	} else {
 		std::array<hpx::future<void>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async<get_neighbor_particles_action>(children[ci], type);
+			futs[ci] = hpx::async<get_neighbor_particles_action>(children[ci].id, type);
 		}
 		hpx::wait_all(futs);
 	}

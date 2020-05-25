@@ -45,6 +45,7 @@ void tree::apply_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 }
 
 mass_attr tree::compute_mass_attributes() {
+	const auto h = options::get().kernel_size;
 	auto &Xcom = mass.com;
 	auto &mtot = mass.mtot;
 	auto &rmaxs = mass.rmaxs;
@@ -69,7 +70,7 @@ mass_attr tree::compute_mass_attributes() {
 			}
 			for (const auto &p : parts) {
 				if (p.m != 0.0) {
-					rmaxb = max(rmaxb, p.h + abs(p.x - Xcom));
+					rmaxb = max(rmaxb, h + abs(p.x - Xcom));
 				}
 			}
 		}
@@ -119,7 +120,6 @@ std::vector<gravity_part> tree::get_gravity_particles() const {
 	for (int i = 0; i < parts.size(); i++) {
 		gparts[i].m = parts[i].m;
 		gparts[i].x = parts[i].x;
-		gparts[i].h = parts[i].h;
 	}
 	return gparts;
 }
@@ -203,6 +203,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		}
 		{
 			PROFILE();
+			const auto h = options::get().kernel_size;
 			for (int i = 0; i < parts.size(); i++) {
 				auto &pi = parts[i];
 				if (pi.t + pi.dt == t + dt || opts.global_time) {
@@ -210,7 +211,6 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 						const auto dx = pi.x - pj[j].x;
 						const auto r = abs(dx);
 						if (r > 0.0) {
-							const auto h = std::max(pi.h, pj[j].h);
 							const auto rinv = 1.0 / r;
 							const auto r2inv = rinv * rinv;
 							if (r > h) {

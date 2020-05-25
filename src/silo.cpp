@@ -8,7 +8,6 @@
 #include <cstdio>
 #include <silo.h>
 #include <ntiger/options.hpp>
-#include <ntiger/delaunay.hpp>
 #include <ntiger/math.hpp>
 #include <ntiger/particle.hpp>
 #include <ntiger/math.hpp>
@@ -49,7 +48,6 @@ int main(int argc, char *argv[]) {
 
 		DBPutPointmesh(db, "points", NDIM, coords, nnodes, DB_DOUBLE, optlist);
 
-		std::vector<real> h;
 		std::vector<real> t;
 		std::vector<real> dt;
 		std::array<std::vector<real>, NDIM> vel;
@@ -63,7 +61,6 @@ int main(int argc, char *argv[]) {
 		for (const auto &pi : parts) {
 			t.push_back(double(pi.t));
 			dt.push_back(double(pi.dt));
-			h.push_back(pi.h);
 			std::array<vect, NDIM> E;
 			for (int dim = 0; dim < NDIM; dim++) {
 				vel[dim].push_back(pi.v[dim]);
@@ -72,7 +69,6 @@ int main(int argc, char *argv[]) {
 		}
 		DBPutPointvar1(db, "t", "points", t.data(), nnodes, DB_DOUBLE, optlist);
 		DBPutPointvar1(db, "dt", "points", dt.data(), nnodes, DB_DOUBLE, optlist);
-		DBPutPointvar1(db, "h", "points", h.data(), nnodes, DB_DOUBLE, optlist);
 		for (int dim = 0; dim < NDIM; dim++) {
 			std::string nm = std::string() + "v_" + char('x' + char(dim));
 			DBPutPointvar1(db, nm.c_str(), "points", vel[dim].data(), nnodes, DB_DOUBLE, optlist);

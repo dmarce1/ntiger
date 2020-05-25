@@ -18,7 +18,6 @@ struct particle {
 	vect x;
 	vect v;
 	vect g;
-	real h;
 	fixed_real t;
 	fixed_real dt;
 	void write(FILE*) const;
@@ -31,10 +30,9 @@ struct particle {
 		a & v;
 		a & g;
 		a & x;
-		a & h;
+		a & phi;
 	}
 	particle() {
-		h = -1.0;
 		t = dt = 0.0;
 	}
 };
@@ -43,11 +41,9 @@ struct particle {
 
 struct gravity_part {
 	real m;
-	real h;
 	vect x;
 	template<class Arc>
 	void serialize(Arc &&arc, unsigned) {
-		arc & h;
 		arc & m;
 		arc & x;
 	}

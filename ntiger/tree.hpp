@@ -98,9 +98,6 @@ public:
 	std::vector<gravity_part> get_gravity_particles() const;
 	mass_attr get_mass_attributes() const;
 	hpx::id_type get_parent() const;
-	std::vector<vect> get_particle_positions(range) const;
-	std::vector<particle> get_particles(range, range) const;
-	void get_neighbor_particles();
 	void rescale(real factor, range mybox);
 	void redistribute_workload(int, int);
 	void send_lost_parts(std::vector<particle> parts);
@@ -137,7 +134,6 @@ public:
 	HPX_DEFINE_COMPONENT_ACTION(tree,destroy);
 	HPX_DEFINE_COMPONENT_ACTION(tree,find_home);
 	HPX_DEFINE_COMPONENT_ACTION(tree,form_tree);
-	HPX_DEFINE_COMPONENT_ACTION(tree,get_neighbor_particles);
 	HPX_DEFINE_COMPONENT_ACTION(tree,finish_drift);
 	HPX_DEFINE_COMPONENT_ACTION(tree,compute_gravity);
 	HPX_DEFINE_COMPONENT_ACTION(tree,rescale);
@@ -152,8 +148,6 @@ public:
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_gravity_particles);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_mass_attributes);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_parent);
-	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_particle_positions);
-	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_particles);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_children);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,send_particles);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_self_and_parent);

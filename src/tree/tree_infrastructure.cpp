@@ -407,6 +407,17 @@ void tree::send_lost_parts(std::vector<particle> lost) {
 	}
 }
 
+
+void tree::send_particles(const std::vector<particle> &pj) {
+	std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
+	PROFILE();
+	for (auto p : pj) {
+		new_parts.push_back(std::move(p));
+	}
+}
+
+
+
 void tree::set_self_and_parent(const hpx::id_type s, const hpx::id_type p) {
 	assert(!dead);
 	self = std::move(s);

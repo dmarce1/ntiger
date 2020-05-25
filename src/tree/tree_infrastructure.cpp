@@ -193,7 +193,6 @@ void tree::find_home(const std::vector<particle> &pis, bool almost_home) {
 			find_home_action()(parent, std::move(parent_parts), false);
 		}
 	} else if (parent_parts.size()) {
-		printf("%i parts left the grid\n", int(parent_parts.size()));
 		std::lock_guard < hpx::lcos::local::mutex > lock(lost_parts_mtx);
 		lost_parts.insert(lost_parts.end(), parent_parts.begin(), parent_parts.end());
 	}
@@ -334,13 +333,11 @@ hpx::id_type tree::migrate(const hpx::id_type &loc) {
 }
 
 void tree::rescale(real factor, range mybox) {
-	printf( "%e\n", factor);
 	if (parent == hpx::invalid_id) {
 		box = scale_range(box, factor);
 	} else {
 		box = mybox;
 	}
-	printf( "%e %e %e %e\n", box.min[0], box.max[0], box.min[1], box.max[1]);
 	std::array<hpx::future<void>, NCHILD> futs;
 	if (!leaf) {
 		range child_box;
@@ -400,7 +397,6 @@ void tree::send_lost_parts(std::vector<particle> lost) {
 			for (int i = 0; i < lost.size(); i++) {
 				if (in_range(lost[i].x, children[ci].box)) {
 					cparts.push_back(lost[i]);
-					printf( "Found match\n");
 					lost[i] = lost[lost.size() - 1];
 					lost.resize(lost.size() - 1);
 				}
@@ -437,9 +433,9 @@ tree_stats tree::tree_statistics() const {
 		stats.nparts = parts.size();
 		stats.nleaves = 1;
 		for (const auto &p : parts) {
-			stats.mass += p.m0;
+			stats.mass += p.m;
 			stats.energy += 0.0;
-			stats.momentum = stats.momentum + p.vf * p.m0;
+			stats.momentum = stats.momentum + p.v * p.m;
 		}
 	} else {
 		stats.nparts = 0;

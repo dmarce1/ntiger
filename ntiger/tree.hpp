@@ -75,13 +75,10 @@ class tree: public hpx::components::component_base<tree> {
 	static hpx::lcos::local::mutex lost_parts_mtx;
 public:
 
-	enum bnd_ex_type { HYDRO, PRIMITIVE, TIMESTEP, NESTING, ALL};
-
 	tree();
 	tree( const std::vector<particle>& _parts, const std::array<node_attr, NCHILD>& _children, const std::array<int, NCHILD>& _child_loads, const range& _root_box, const range& _box, bool _leaf );
 	tree(std::vector<particle>&&, const range&, const range&);
 
-	bool adjust_timesteps(fixed_real t, int);
 	void apply_gravity(fixed_real, fixed_real);
 	mass_attr compute_mass_attributes();
 	void compute_drift(fixed_real);
@@ -103,9 +100,7 @@ public:
 	hpx::id_type get_parent() const;
 	std::vector<vect> get_particle_positions(range) const;
 	std::vector<particle> get_particles(range, range) const;
-	void get_neighbor_particles(enum bnd_ex_type);
-	std::vector<nesting_particle> get_nesting_particles(range, range) const;
-	std::vector<timestep_particle> get_timestep_particles(range, range) const;
+	void get_neighbor_particles();
 	void rescale(real factor, range mybox);
 	void redistribute_workload(int, int);
 	void send_lost_parts(std::vector<particle> parts);
@@ -132,7 +127,6 @@ public:
 		arc & mass;
 	}
 
-	HPX_DEFINE_COMPONENT_ACTION(tree,adjust_timesteps);
 	HPX_DEFINE_COMPONENT_ACTION(tree,apply_gravity);
 	HPX_DEFINE_COMPONENT_ACTION(tree,compute_mass_attributes);
 	HPX_DEFINE_COMPONENT_ACTION(tree,compute_drift);
@@ -160,8 +154,6 @@ public:
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_parent);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_particle_positions);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_particles);
-	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_nesting_particles);
-	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_timestep_particles);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_children);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,send_particles);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_self_and_parent);

@@ -31,7 +31,6 @@ void drift(fixed_real t, fixed_real dt) {
 void rescale() {
 	const auto new_scale = tree::compute_scale_factor_action()(root);
 	if (new_scale > 1.0) {
-		printf("Re-scaling by %e\n", new_scale.get());
 		tree::rescale_action()(root, new_scale, range());
 		tree::send_lost_parts_action()(root, std::vector<particle>());
 		tree::finish_drift_action()(root);
@@ -58,15 +57,7 @@ void write_checkpoint(int i, fixed_real t) {
 
 fixed_real timestep(fixed_real t) {
 	static const auto opts = options::get();
-	tree::get_neighbor_particles_action()(root, tree::TIMESTEP);
 	fixed_real dt = tree::compute_timestep_action()(root, t);
-//	if (!opts.global_time) {
-//		bool rc;
-//		do {
-//			tree::get_neighbor_particles_action()(root, tree::NESTING);
-//			rc = tree::adjust_timesteps_action()(root, t, 2);
-//		} while (rc);
-//	}
 	return dt;
 }
 
@@ -112,7 +103,7 @@ int hpx_main(int argc, char *argv[]) {
 	root = hpx::new_ < tree > (hpx::find_here(), std::move(parts), box, null_range()).get();
 	init(t, t0);
 	solve_gravity(t, 0.0);
-	tree::get_neighbor_particles_action()(root, tree::PRIMITIVE);
+//	tree::get_neighbor_particles_action()(root, tree::PRIMITIVE);
 //	tree::set_drift_velocity_action()(root, t);
 	fixed_real dt = timestep(t);
 	write_checkpoint(0, t);

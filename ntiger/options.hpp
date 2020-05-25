@@ -12,23 +12,23 @@ public:
 	int parts_per_node;
 	int problem_size;
 	double fgamma;
-	double kep_eps;
 	double theta;
 	double tmax;
 	double cfl;
 	double output_freq;
 	double grid_size;
+	double kernel_size;
 	std::string problem;
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
 		arc & cfl;
-		arc & kep_eps;
 		arc & checkpoint;
 		arc & config_file;
 		arc & fpe;
 		arc & global_time;
 		arc & gravity;
+		arc & kernel_size;
 		arc & parts_per_node;
 		arc & problem_size;
 		arc & fgamma;

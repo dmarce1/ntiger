@@ -45,8 +45,13 @@ inline real W(real r, real h) {
 	return bspline(2 * r / h) / norm;
 }
 
-inline real grav_force(real r, real h) {
-	return -1.0 / (r * r);
+inline real grav_force(real R, real h) {
+	if (R < h) {
+		return -R / (h * h * h);
+	} else {
+		return -1.0 / (R * R);
+	}
+
 }
 
 inline real bspline(real r) {
@@ -69,6 +74,5 @@ inline real W_norm(real h) {
 		return M_PI * h * h * h / 8.0;
 	}
 }
-
 
 #endif /* SRC_MATH_HPP_ */

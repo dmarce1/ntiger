@@ -1,14 +1,13 @@
 #include <ntiger/initialize.hpp>
 #include <ntiger/options.hpp>
 #include <ntiger/physcon.hpp>
-#include <ntiger/polytrope.hpp>
 #include <ntiger/rand.hpp>
 
 std::vector<particle> kepler(int cnt) {
 	std::vector<particle> parts(cnt);
 	const auto m = 1.0e-3 / cnt;
-	parts[0].m0 = 1.0;
-	parts[0].vf = vect(0);
+	parts[0].m = 1.0;
+	parts[0].v = vect(0);
 	parts[0].x = vect(0);
 	for (int i = 1; i < cnt; i++) {
 		bool done = false;
@@ -19,13 +18,13 @@ std::vector<particle> kepler(int cnt) {
 			const auto rsqrrinv = 1.0 / (r * sqrt(r));
 			auto &p = parts[i];
 			if (r < 0.5 && r > 0.1) {
-				p.m0 = 0.0;
+				p.m = 0.0;
 				p.x[0] = x;
 				p.x[1] = y;
-				p.vf[0] = -y * rsqrrinv;
-				p.vf[1] = x * rsqrrinv;
+				p.v[0] = -y * rsqrrinv;
+				p.v[1] = x * rsqrrinv;
 				if ( NDIM > 2) {
-					p.x[2] = p.vf[2] = 0.0;
+					p.x[2] = p.v[2] = 0.0;
 				}
 				done = true;
 			}

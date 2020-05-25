@@ -34,7 +34,7 @@ bool options::process_options(int argc, char *argv[]) {
 		("cfl", po::value<double>(&cfl)->default_value(0.4), "CFL factor") //
 		("checkpoint", po::value<std::string>(&checkpoint)->default_value(""), "checkpoint file") //
 		("config_file", po::value<std::string>(&config_file)->default_value(""), "configuration file") //
-		("kep_eps", po::value<double>(&kep_eps)->default_value(0.05), "softening length for central force") //
+		("kernel_size", po::value<double>(&kernel_size)->default_value(-1), "softening length  < 0 = variable") //
 		("fgamma", po::value<double>(&fgamma)->default_value(7.0 / 5.0), "gamma for fluid gamma law") //
 		("fpe", po::value<bool>(&fpe)->default_value(true), "enable floating point exceptions") //
 		("global_time", po::value<bool>(&global_time)->default_value(false), "enable global time-stepping") //
@@ -86,6 +86,7 @@ bool options::process_options(int argc, char *argv[]) {
 	SHOW(fpe);
 	SHOW(global_time);
 	SHOW(gravity);
+	SHOW(kernel_size);
 	SHOW(parts_per_node);
 	SHOW(problem_size);
 	SHOW(theta);

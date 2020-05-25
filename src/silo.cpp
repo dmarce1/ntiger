@@ -49,7 +49,6 @@ int main(int argc, char *argv[]) {
 
 		DBPutPointmesh(db, "points", NDIM, coords, nnodes, DB_DOUBLE, optlist);
 
-		std::vector<real> Nc;
 		std::vector<real> h;
 		std::vector<real> t;
 		std::vector<real> dt;
@@ -66,16 +65,14 @@ int main(int argc, char *argv[]) {
 			dt.push_back(double(pi.dt));
 			h.push_back(pi.h);
 			std::array<vect, NDIM> E;
-			Nc.push_back(pi.Nc);
 			for (int dim = 0; dim < NDIM; dim++) {
-				vel[dim].push_back(pi.vf[dim]);
+				vel[dim].push_back(pi.v[dim]);
 				g[dim].push_back(pi.g[dim]);
 			}
 		}
 		DBPutPointvar1(db, "t", "points", t.data(), nnodes, DB_DOUBLE, optlist);
 		DBPutPointvar1(db, "dt", "points", dt.data(), nnodes, DB_DOUBLE, optlist);
 		DBPutPointvar1(db, "h", "points", h.data(), nnodes, DB_DOUBLE, optlist);
-		DBPutPointvar1(db, "Nc", "points", Nc.data(), nnodes, DB_DOUBLE, optlist);
 		for (int dim = 0; dim < NDIM; dim++) {
 			std::string nm = std::string() + "v_" + char('x' + char(dim));
 			DBPutPointvar1(db, nm.c_str(), "points", vel[dim].data(), nnodes, DB_DOUBLE, optlist);

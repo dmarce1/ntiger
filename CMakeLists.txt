@@ -32,7 +32,6 @@ set(ntiger_source_files
 	src/initialize.cpp
 	src/main.cpp
 	src/range.cpp
-	src/polytrope.cpp
 	src/profiler.cpp
 	src/tree/tree_infrastructure.cpp
 	src/tree/tree_compute.cpp

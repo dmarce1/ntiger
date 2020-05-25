@@ -18,31 +18,9 @@ constexpr int NNGB = 32;
 #endif
 #endif
 
-void tree::advance_time(fixed_real t) {
-	static auto opts = options::get();
-	const auto use_grav = opts.gravity || opts.problem == "kepler";
-	if (leaf) {
-		PROFILE();
-		parts.resize(nparts0);
-		for (int i = 0; i < nparts0; i++) {
-			auto &p = parts[i];
-			if (p.t + p.dt == t || opts.global_time) {
-				p.t += p.dt;
-			}
-		}
-	} else {
-		std::array<hpx::future<void>, NCHILD> futs;
-		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < advance_time_action > (children[ci].id, t);
-		}
-		hpx::wait_all(futs);
-	}
-}
-
 void tree::compute_drift(fixed_real dt) {
 	static const auto opts = options::get();
 	if (leaf) {
-		std::vector < std::vector < particle >> send_parts(siblings.size());
 		std::vector<particle> parent_parts;
 		{
 			PROFILE();
@@ -52,17 +30,7 @@ void tree::compute_drift(fixed_real dt) {
 				auto &pi = parts[i];
 				pi.x = pi.x + pi.v * double(dt);
 				if (!in_range(pi.x, box)) {
-					found = false;
-					for (int j = 0; j < siblings.size(); j++) {
-						if (in_range(pi.x, siblings[j].box)) {
-							send_parts[j].push_back(pi);
-							found = true;
-							break;
-						}
-					}
-					if (!found) {
-						parent_parts.push_back(pi);
-					}
+					parent_parts.push_back(pi);
 					sz--;
 					parts[i] = parts[sz];
 					i--;
@@ -70,19 +38,14 @@ void tree::compute_drift(fixed_real dt) {
 				}
 			}
 		}
-		std::vector<hpx::future<void>> futs(siblings.size());
-		for (int j = 0; j < siblings.size(); j++) {
-			futs[j] = hpx::async < send_particles_action > (siblings[j].id, std::move(send_parts[j]));
-		}
 		if (parent != hpx::invalid_id) {
 			if (parent_parts.size()) {
-				find_home_action()(parent, std::move(parent_parts), false);
+				find_home_action()(parent, std::move(parent_parts));
 			}
 		} else if (parent_parts.size()) {
 			std::lock_guard < hpx::lcos::local::mutex > lock(lost_parts_mtx);
 			lost_parts.insert(lost_parts.end(), parent_parts.begin(), parent_parts.end());
 		}
-		hpx::wait_all(futs);
 	} else {
 		std::array<hpx::future<void>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
@@ -116,6 +79,9 @@ fixed_real tree::compute_timestep(fixed_real t) {
 		PROFILE();
 		for (int i = 0; i < nparts0; i++) {
 			auto &pi = parts[i];
+			if (pi.t + pi.dt == t || opts.global_time) {
+				pi.t += pi.dt;
+			}
 			if (pi.t == t || opts.global_time) {
 				pi.dt = fixed_real::max();
 				const auto a = abs(pi.g);
@@ -143,17 +109,3 @@ fixed_real tree::compute_timestep(fixed_real t) {
 	}
 	return tmin;
 }
-
-void tree::compute_interactions() {
-	if (leaf) {
-		static auto opts = options::get();
-		nparts0 = parts.size();
-	} else {
-		std::array<hpx::future<void>, NCHILD> futs;
-		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < compute_interactions_action > (children[ci].id);
-		}
-		hpx::wait_all(futs);
-	}
-}
-

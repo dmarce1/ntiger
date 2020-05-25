@@ -24,8 +24,7 @@ void drift(fixed_real t, fixed_real dt) {
 	tree::compute_workload_action()(root);
 	tree::redistribute_workload_action()(root, 0, s.nparts);
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
-	tree::form_tree_action()(root, std::vector < hpx::id_type > (1, root), true);
-	tree::compute_interactions_action()(root);
+	tree::form_tree_action()(root);
 }
 
 void rescale() {
@@ -39,8 +38,7 @@ void rescale() {
 		tree::compute_workload_action()(root);
 		tree::redistribute_workload_action()(root, 0, s.nparts);
 		tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
-		tree::form_tree_action()(root, std::vector < hpx::id_type > (1, root), true);
-		tree::compute_interactions_action()(root);
+		tree::form_tree_action()(root);
 	}
 
 }
@@ -48,8 +46,8 @@ void rescale() {
 void init(fixed_real t, bool t0) {
 	static const auto opts = options::get();
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
-	tree::form_tree_action()(root, std::vector < hpx::id_type > (1, root), true);
-	tree::compute_interactions_action()(root);
+	tree::form_tree_action()(root);
+
 }
 
 void write_checkpoint(int i, fixed_real t) {
@@ -104,8 +102,6 @@ int hpx_main(int argc, char *argv[]) {
 	root = hpx::new_ < tree > (hpx::find_here(), std::move(parts), box, null_range()).get();
 	init(t, t0);
 	solve_gravity(t, 0.0, false);
-//	tree::get_neighbor_particles_action()(root, tree::PRIMITIVE);
-//	tree::set_drift_velocity_action()(root, t);
 	fixed_real dt = timestep(t);
 	write_checkpoint(0, t);
 	int oi = 0;
@@ -119,13 +115,13 @@ int hpx_main(int argc, char *argv[]) {
 		for (int dim = 0; dim < NDIM; dim++) {
 			printf("%e ", s.momentum[dim].get());
 		}
-		printf("ek = %e ep = %e ev = %e verr = %e etot = %e\n", s.ek.get(), s.ep.get(), s.ev.get(), s.ev.get() / (std::abs(s.ep.get())+1.0e-100), s.ev.get() + s.ep.get());
+		printf("ek = %e ep = %e ev = %e verr = %e etot = %e\n", s.ek.get(), s.ep.get(), s.ev.get(), s.ev.get() / (std::abs(s.ep.get()) + 1.0e-100),
+				s.ev.get() + s.ep.get());
 		//	rescale();
 		solve_gravity(t, dt, true);
 		drift(t, dt);
 		solve_gravity(t, dt, false);
 		t += dt;
-		tree::advance_time_action()(root, t);
 		if (int((last_output / fixed_real(opts.output_freq))) != int(((t / fixed_real(opts.output_freq))))) {
 			last_output = t;
 			write_checkpoint(++oi, t);

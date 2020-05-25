@@ -3,6 +3,26 @@
 #include <ntiger/physcon.hpp>
 #include <ntiger/rand.hpp>
 
+std::vector<particle> plummer(int cnt) {
+	std::vector<particle> p(cnt);
+	real rmax = 5.0;
+	for (int i = 0; i < cnt; i++) {
+		vect x;
+		real rho;
+		real r;
+		do {
+			x = rand_unit_vect() * rmax * rand1();
+			r = abs(x);
+			rho = pow(1.0 + r * r, -5.0 / 2.0);
+		} while (rand1() > rho);
+		real dv = sqrt(1.0 / 6.0 / sqrt(r * r + 1.0) * (3.0 / 4.0 / M_PI) * cnt);
+		p[i].x = x;
+		p[i].v = rand_unit_vect() * dv;
+		p[i].m = 1.0;
+	}
+	return p;
+}
+
 std::vector<particle> kepler(int cnt) {
 	std::vector<particle> parts(cnt);
 	const auto m = 1.0e-3 / cnt;
@@ -35,10 +55,10 @@ std::vector<particle> kepler(int cnt) {
 
 std::vector<particle> get_initial_particles(const std::string &name, int cnt) {
 	if (false) {
-#if(NDIM>1)
 	} else if (name == "kepler") {
 		return kepler(cnt);
-#endif
+	} else if (name == "plummer") {
+		return plummer(cnt);
 	} else {
 		printf("Error: Initialization function %s is not known\n", name.c_str());
 		abort();

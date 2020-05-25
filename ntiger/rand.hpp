@@ -13,6 +13,8 @@
 #include "vect.hpp"
 
 real rand_unit_box();
+real rand1();
+vect rand_unit_vect();
 
 
 #endif /* SRC_RAND_HPP_ */

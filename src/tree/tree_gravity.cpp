@@ -147,6 +147,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			for (auto &pi : parts) {
 				if (pi.t + pi.dt == t + dt || opts.global_time) {
 					pi.g = vect(0);
+					pi.phi = 0.0;
 				}
 			}
 		}
@@ -168,8 +169,10 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 					auto &pi = parts[i];
 					if (pi.t + pi.dt == t + dt || opts.global_time) {
 						const auto r = pi.x - masses[j].com;
-						const auto r3inv = pow(abs(r), -3);
+						const auto rinv = 1.0 / abs(r);
+						const auto r3inv = pow(rinv, 3);
 						pi.g = pi.g - r * (G * masses[j].mtot * r3inv);
+						pi.phi = pi.phi - G * masses[j].mtot * rinv;
 					}
 				}
 			}
@@ -188,13 +191,19 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				auto &pi = parts[i];
 				if (pi.t + pi.dt == t + dt || opts.global_time) {
 					for (int j = 0; j < pj.size(); j++) {
-						const auto r = pi.x - pj[j].x;
-						const auto r0 = abs(r);
-						if (r0 > 0.0) {
-							const auto h = std::max(pi.h,pj[j].h);
-							const auto f = grav_force(abs(r), h);
-							const auto c = f * G * pj[j].m;
-							pi.g = pi.g + r * c / r0;
+						const auto dx = pi.x - pj[j].x;
+						const auto r = abs(dx);
+						if (r > 0.0) {
+							const auto h = std::max(pi.h, pj[j].h);
+							const auto rinv = 1.0 / r;
+							const auto r2inv = rinv * rinv;
+							if (r > h) {
+								pi.g = pi.g - (dx / r) * G * pj[j].m * r2inv;
+								pi.phi = pi.phi - G * pj[j].m * rinv;
+							} else {
+								pi.g = pi.g - (dx / r) * G * pj[j].m * r / (h * h * h);
+								pi.phi = pi.phi - G * pj[j].m * (1.5 * h * h - 0.5 * r * r) / (h * h * h);
+							}
 						}
 					}
 				}

@@ -10,7 +10,9 @@ struct tree_stats {
 	int nleaves;
 	int nparts;
 	real mass;
-	real energy;
+	real ek;
+	real ep;
+	real ev;;
 	vect momentum;
 	void print() const;
 	template<class Arc>
@@ -20,7 +22,9 @@ struct tree_stats {
 		arc & nleaves;
 		arc & nparts;
 		arc & mass;
-		arc & energy;
+		arc & ek;
+		arc & ep;
+		arc & ev;
 		arc & momentum;
 	}
 };

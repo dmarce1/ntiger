@@ -30,3 +30,9 @@ vect rand_unit_vect() {
 	}
 	return n;
 }
+
+real rand_normal() {
+	const auto u1 = rand1();
+	const auto u2 = rand1();
+	return sqrt(-log(u1)) * cos(2.0 * M_PI * u2);
+}

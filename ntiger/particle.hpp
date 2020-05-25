@@ -14,6 +14,7 @@
 
 struct particle {
 	real m;
+	real phi;
 	vect x;
 	vect v;
 	vect g;

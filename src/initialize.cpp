@@ -15,9 +15,12 @@ std::vector<particle> plummer(int cnt) {
 			r = abs(x);
 			rho = pow(1.0 + r * r, -5.0 / 2.0);
 		} while (rand1() > rho);
-		real dv = sqrt(1.0 / 6.0 / sqrt(r * r + 1.0) * (3.0 / 4.0 / M_PI) * cnt);
+		real dv = sqrt(1.0 / sqrt(r * r + 1.0) * (8.0 / 3.0) * cnt);
 		p[i].x = x;
-		p[i].v = rand_unit_vect() * dv;
+		p[i].v = rand_unit_vect() * rand_normal() * dv;
+//		for (int dim = 0; dim < NDIM; dim++) {
+//			p[i].v[dim] = rand_normal() * dv;
+//		}
 		p[i].m = 1.0;
 	}
 	return p;

@@ -119,9 +119,9 @@ int hpx_main(int argc, char *argv[]) {
 		for (int dim = 0; dim < NDIM; dim++) {
 			printf("%e ", s.momentum[dim].get());
 		}
-		printf("Energy = %e\n", s.energy.get());
+		printf("ek = %e ep = %e ev = %e verr = %e etot = %e\n", s.ek.get(), s.ep.get(), s.ev.get(), s.ev.get() / s.ep.get(), s.ev.get() + s.ep.get());
 		drift(t, dt / fixed_real(2));
-	//	rescale();
+		//	rescale();
 		solve_gravity(t, dt);
 		drift(t, dt / fixed_real(2));
 		t += dt;

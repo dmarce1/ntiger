@@ -15,6 +15,7 @@
 real rand_unit_box();
 real rand1();
 vect rand_unit_vect();
+real rand_normal();
 
 
 #endif /* SRC_RAND_HPP_ */

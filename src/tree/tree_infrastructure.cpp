@@ -189,7 +189,7 @@ void tree::find_home(const std::vector<particle> &pis, bool almost_home) {
 		self_fut = hpx::make_ready_future<void>();
 	}
 	if (parent != hpx::invalid_id) {
-		if( parent_parts.size() ) {
+		if (parent_parts.size()) {
 			find_home_action()(parent, std::move(parent_parts), false);
 		}
 	} else if (parent_parts.size()) {
@@ -427,14 +427,21 @@ tree_stats tree::tree_statistics() const {
 	stats.max_level = 0;
 	stats.nnodes = 1;
 	stats.mass = 0.0;
-	stats.energy = 0.0;
+	stats.ek = 0.0;
+	stats.ep = 0.0;
 	stats.momentum = vect(0);
+	stats.ev = 0.0;
 	if (leaf) {
 		stats.nparts = parts.size();
 		stats.nleaves = 1;
 		for (const auto &p : parts) {
 			stats.mass += p.m;
-			stats.energy += 0.0;
+			const real ek = 0.5 * p.v.dot(p.v) * p.m;
+			const real ep = 0.5 * p.phi * p.m;
+			const real ev = 2.0 * ek + ep;
+			stats.ek += ek;
+			stats.ep += ep;
+			stats.ev += ev;
 			stats.momentum = stats.momentum + p.v * p.m;
 		}
 	} else {
@@ -450,7 +457,9 @@ tree_stats tree::tree_statistics() const {
 			stats.nleaves += cstat.nleaves;
 			stats.nnodes += cstat.nnodes;
 			stats.nparts += cstat.nparts;
-			stats.energy += cstat.energy;
+			stats.ev += cstat.ev;
+			stats.ep += cstat.ep;
+			stats.ek += cstat.ek;
 			stats.mass += cstat.mass;
 			stats.momentum = stats.momentum + cstat.momentum;
 		}

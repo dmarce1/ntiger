@@ -29,6 +29,7 @@ void rescale() {
 	if (new_scale > 1.0) {
 		printf("Re-scaling by %e\n", new_scale.get());
 		tree::rescale_action()(root, new_scale, range());
+		tree::compute_drift_action()(root, 0.0);
 		tree::finish_drift_action()(root);
 		tree::send_lost_parts_action()(root, std::vector<particle>());
 		const auto s = tree::tree_statistics_action()(root);
@@ -116,10 +117,10 @@ int hpx_main(int argc, char *argv[]) {
 		}
 		printf("ek = %e ep = %e ev = %e verr = %e etot = %e\n", s.ek.get(), s.ep.get(), s.ev.get(), s.ev.get() / (std::abs(s.ep.get()) + 1.0e-100),
 				s.ev.get() + s.ep.get());
-		//	rescale();
 		solve_gravity(t, dt, true);
 		drift(t, dt);
 		solve_gravity(t, dt, false);
+		rescale();
 		t += dt;
 		if (int((last_output / fixed_real(opts.output_freq))) != int(((t / fixed_real(opts.output_freq))))) {
 			last_output = t;

@@ -180,10 +180,10 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		}
 		{
 			PROFILE();
-			for (int j = 0; j < masses.size(); j++) {
-				for (int i = 0; i < parts.size(); i++) {
-					auto &pi = parts[i];
-					if (pi.t + pi.dt == t + dt || opts.global_time) {
+			for (int i = 0; i < parts.size(); i++) {
+				auto &pi = parts[i];
+				if (pi.t + pi.dt == t + dt || opts.global_time) {
+					for (int j = 0; j < masses.size(); j++) {
 						const auto r = pi.x - masses[j].com;
 						const auto rinv = 1.0 / abs(r);
 						const auto r3inv = pow(rinv, 3);

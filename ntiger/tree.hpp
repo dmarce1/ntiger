@@ -90,7 +90,6 @@ public:
 	void create_children();
 	std::vector<particle> destroy();
 	void find_home(const std::vector<particle>&);
-	void form_tree();
 	tree_attr finish_drift();
 	tree_attr get_attributes() const;
 	std::array<hpx::id_type, NCHILD> get_children() const;
@@ -122,7 +121,31 @@ public:
 		arc & mass;
 	}
 
-	HPX_DEFINE_COMPONENT_ACTION(tree,apply_gravity);HPX_DEFINE_COMPONENT_ACTION(tree,compute_mass_attributes);HPX_DEFINE_COMPONENT_ACTION(tree,compute_drift);HPX_DEFINE_COMPONENT_ACTION(tree,compute_timestep);HPX_DEFINE_COMPONENT_ACTION(tree,compute_interactions);HPX_DEFINE_COMPONENT_ACTION(tree,compute_workload);HPX_DEFINE_COMPONENT_ACTION(tree,destroy);HPX_DEFINE_COMPONENT_ACTION(tree,find_home);HPX_DEFINE_COMPONENT_ACTION(tree,form_tree);HPX_DEFINE_COMPONENT_ACTION(tree,finish_drift);HPX_DEFINE_COMPONENT_ACTION(tree,compute_gravity);HPX_DEFINE_COMPONENT_ACTION(tree,rescale);HPX_DEFINE_COMPONENT_ACTION(tree,redistribute_workload);HPX_DEFINE_COMPONENT_ACTION(tree,send_lost_parts);HPX_DEFINE_COMPONENT_ACTION(tree,tree_statistics);HPX_DEFINE_COMPONENT_ACTION(tree,write_checkpoint);HPX_DEFINE_COMPONENT_ACTION(tree,write_silo);HPX_DEFINE_COMPONENT_ACTION(tree,migrate);HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_scale_factor);HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_attributes);HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_gravity_particles);HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_mass_attributes);HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_parent);HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_children);HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,send_particles);HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_self_and_parent);
+	HPX_DEFINE_COMPONENT_ACTION(tree,apply_gravity);
+	HPX_DEFINE_COMPONENT_ACTION(tree,compute_mass_attributes);
+	HPX_DEFINE_COMPONENT_ACTION(tree,compute_drift);
+	HPX_DEFINE_COMPONENT_ACTION(tree,compute_timestep);
+	HPX_DEFINE_COMPONENT_ACTION(tree,compute_interactions);
+	HPX_DEFINE_COMPONENT_ACTION(tree,compute_workload);
+	HPX_DEFINE_COMPONENT_ACTION(tree,destroy);
+	HPX_DEFINE_COMPONENT_ACTION(tree,find_home);
+	HPX_DEFINE_COMPONENT_ACTION(tree,finish_drift);
+	HPX_DEFINE_COMPONENT_ACTION(tree,compute_gravity);
+	HPX_DEFINE_COMPONENT_ACTION(tree,rescale);
+	HPX_DEFINE_COMPONENT_ACTION(tree,redistribute_workload);
+	HPX_DEFINE_COMPONENT_ACTION(tree,send_lost_parts);
+	HPX_DEFINE_COMPONENT_ACTION(tree,tree_statistics);
+	HPX_DEFINE_COMPONENT_ACTION(tree,write_checkpoint);
+	HPX_DEFINE_COMPONENT_ACTION(tree,write_silo);
+	HPX_DEFINE_COMPONENT_ACTION(tree,migrate);
+	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_scale_factor);
+	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_attributes);
+	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_gravity_particles);
+	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_mass_attributes);
+	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_parent);
+	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_children);
+	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,send_particles);
+	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_self_and_parent);
 
 };
 

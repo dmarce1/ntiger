@@ -20,11 +20,8 @@ void solve_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 void drift(fixed_real t, fixed_real dt) {
 	tree::compute_drift_action()(root, dt);
 	tree::finish_drift_action()(root);
-	const auto s = tree::tree_statistics_action()(root);
-	tree::compute_workload_action()(root);
-	tree::redistribute_workload_action()(root, 0, s.nparts);
+	tree::redistribute_workload_action()(root, 0, tree::compute_workload_action()(root));
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
-	tree::form_tree_action()(root);
 }
 
 void rescale() {
@@ -35,10 +32,8 @@ void rescale() {
 		tree::finish_drift_action()(root);
 		tree::send_lost_parts_action()(root, std::vector<particle>());
 		const auto s = tree::tree_statistics_action()(root);
-		tree::compute_workload_action()(root);
-		tree::redistribute_workload_action()(root, 0, s.nparts);
+		tree::redistribute_workload_action()(root, 0, tree::compute_workload_action()(root));
 		tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
-		tree::form_tree_action()(root);
 	}
 
 }
@@ -46,7 +41,6 @@ void rescale() {
 void init(fixed_real t, bool t0) {
 	static const auto opts = options::get();
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
-	tree::form_tree_action()(root);
 
 }
 

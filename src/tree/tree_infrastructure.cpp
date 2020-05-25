@@ -225,18 +225,6 @@ tree_attr tree::finish_drift() {
 	return get_attributes();
 }
 
-void tree::form_tree() {
-	static auto opts = options::get();
-	if (leaf) {
-	} else {
-		std::array<hpx::future<void>, NCHILD> futs;
-		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < form_tree_action > (children[ci].id);
-		}
-		hpx::wait_all(futs);
-	}
-	nparts0 = parts.size();
-}
 
 tree_attr tree::get_attributes() const {
 	tree_attr attr;
@@ -362,6 +350,7 @@ void tree::set_self_and_parent(const hpx::id_type s, const hpx::id_type p) {
 		}
 		hpx::wait_all(futs);
 	}
+	nparts0 = parts.size();
 }
 
 tree_stats tree::tree_statistics() const {

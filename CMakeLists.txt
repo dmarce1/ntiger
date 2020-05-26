@@ -22,10 +22,15 @@ find_package(Silo REQUIRED)
 find_package(Boost REQUIRED)
 
 set(common_source_files
+    src/ewald.cpp
 	src/math.cpp
 	src/particle.cpp
 	src/rand.cpp
 	src/options.cpp
+)
+
+set(ewald_source_files
+	src/ewald_main.cpp
 )
 
 set(ntiger_source_files
@@ -49,6 +54,10 @@ set(common_header_files
 	ntiger/particle.hpp
 	ntiger/real.hpp
 	ntiger/vect.hpp
+)
+
+set(ewald_header_files
+	ntiger/ewald.hpp
 )
 
 set(ntiger_header_files
@@ -88,9 +97,20 @@ add_hpx_executable(
     ${check2silo_header_files}
 )
 
+add_hpx_executable(
+  ewald
+  DEPENDENCIES
+    Silo::silo Boost::boost ntigerlib
+  SOURCES
+    ${ewald_source_files}
+  HEADERS
+    ${ewald_header_files}
+)
+
 target_compile_options(ntigerlib PUBLIC -std=c++1z)
 target_include_directories(ntigerlib PUBLIC ${PROJECT_SOURCE_DIR})
 target_include_directories(ntiger PUBLIC ${PROJECT_SOURCE_DIR})
 target_include_directories(check2silo PUBLIC ${PROJECT_SOURCE_DIR})
+target_include_directories(ewald PUBLIC ${PROJECT_SOURCE_DIR})
 
 

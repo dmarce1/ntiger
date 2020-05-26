@@ -70,10 +70,30 @@ std::vector<particle> kepler(int cnt) {
 	return parts;
 }
 
+std::vector<particle> cosmos(int cnt) {
+	std::vector<particle> p(cnt);
+	real rmax = 1.0;
+	for (int i = 0; i < cnt; i++) {
+		vect x;
+		real rho;
+		real r;
+		do {
+			x = rand_unit_vect() * rmax;
+			r = abs(x);
+		} while (r > rmax);
+		p[i].v = x*10*sqrt(50);
+		p[i].x = x;
+		p[i].m = 1.0;
+	}
+	return p;
+}
+
 std::vector<particle> get_initial_particles(const std::string &name, int cnt) {
 	if (false) {
 	} else if (name == "kepler") {
 		return kepler(cnt);
+	} else if (name == "cosmos") {
+		return cosmos(cnt);
 	} else if (name == "toomre") {
 		return toomre1(cnt);
 	} else if (name == "plummer") {

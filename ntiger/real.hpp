@@ -105,6 +105,7 @@ public:
 	friend real operator-(real_type a, real b);
 	friend real operator*(real_type a, real b);
 	friend real operator/(real_type a, real b);
+	friend real erf(real a);
 };
 
 inline real operator+(real_type a, real b) {
@@ -141,6 +142,10 @@ inline real log(real a) {
 
 inline real sqrt(real a) {
 	return real(std::sqrt(a.r));
+}
+
+inline real erf(real a) {
+	return real(std::erf(a.r));
 }
 
 inline real sin(real a) {

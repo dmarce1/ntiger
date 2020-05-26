@@ -192,10 +192,16 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				if (pi.t + pi.dt == t + dt || opts.global_time) {
 					for (int j = 0; j < masses.size(); j++) {
 						const auto r = pi.x - masses[j].com;
+				//		printf( "%e %e\n", pi.x[0], masses[j].com[0]);
 						const auto rinv = 1.0 / abs(r);
 						const auto r3inv = pow(rinv, 3);
-						pi.g = pi.g - r * (G * masses[j].mtot * r3inv);
-						pi.phi = pi.phi - G * masses[j].mtot * rinv;
+						if( opts.ewald) {
+							pi.g = pi.g + ewald_force(r) * (G * masses[j].mtot);
+							pi.phi = pi.phi + ewald_potential(r) * G * masses[j].mtot;
+						} else {
+							pi.g = pi.g - r * (G * masses[j].mtot * r3inv);
+							pi.phi = pi.phi - G * masses[j].mtot * rinv;
+						}
 					}
 				}
 			}
@@ -217,8 +223,8 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 								const auto r2inv = rinv * rinv;
 								if (r > h) {
 									if (opts.ewald) {
-										pi.g = pi.g - ewald_force(dx) * G * pj[j].m;
-										pi.phi = pi.phi - G * ewald_potential(r) * pj[j].m;
+										pi.g = pi.g + ewald_force(dx) * G * pj[j].m;
+										pi.phi = pi.phi + G * ewald_potential(dx) * pj[j].m;
 									} else {
 										pi.g = pi.g - (dx / r) * G * pj[j].m * r2inv;
 										pi.phi = pi.phi - G * pj[j].m * rinv;
@@ -227,6 +233,8 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 									pi.g = pi.g - (dx / r) * G * pj[j].m * r / (h * h * h);
 									pi.phi = pi.phi - G * pj[j].m * (1.5 * h * h - 0.5 * r * r) / (h * h * h);
 								}
+							} else if (opts.ewald) {
+								pi.phi += 2.8372975;
 							}
 						}
 					}
@@ -247,6 +255,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			} else {
 				sep = abs(ZA - ZB);
 			}
+			printf( "%e\n", sep);
 			if (sep > (rmaxA + rmaxB) / theta) {
 				masses.push_back(tmp);
 			} else if (tmp.leaf) {

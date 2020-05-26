@@ -18,8 +18,13 @@ void solve_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 }
 
 void drift(fixed_real t, fixed_real dt) {
+	const auto opts = options::get();
 	tree::compute_drift_action()(root, dt);
 	tree::finish_drift_action()(root);
+	if (opts.ewald) {
+		const auto s = tree::tree_statistics_action()(root);
+		tree::apply_boost_action()(root, -s.momentum/s.mass);
+	}
 	tree::redistribute_workload_action()(root, 0, tree::compute_workload_action()(root));
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
 }

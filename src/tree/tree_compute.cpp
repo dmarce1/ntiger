@@ -7,6 +7,22 @@
 
 #include <hpx/synchronization/mutex.hpp>
 
+void tree::apply_boost(vect x) {
+	static const auto opts = options::get();
+	if (leaf) {
+		for (int i = 0; i < parts.size(); i++) {
+			auto &pi = parts[i];
+			pi.v = pi.v + x;
+		}
+	} else {
+		std::array<hpx::future<void>, NCHILD> futs;
+		for (int ci = 0; ci < NCHILD; ci++) {
+			futs[ci] = hpx::async < apply_boost_action > (children[ci].id, x);
+		}
+		hpx::wait_all(futs);
+	}
+
+}
 void tree::compute_drift(fixed_real dt) {
 	static const auto opts = options::get();
 	if (leaf) {

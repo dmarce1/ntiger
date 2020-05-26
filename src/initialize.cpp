@@ -75,16 +75,19 @@ std::vector<particle> cosmos(int cnt) {
 	real rmax = 1.0;
 	for (int i = 0; i < cnt; i++) {
 		vect x;
-		real rho;
-		real r;
-		do {
-			x = rand_unit_vect() * rmax;
-			r = abs(x);
-		} while (r > rmax);
-		p[i].v = x*10*sqrt(50);
+		for( int dim = 0; dim < NDIM; dim++) {
+			x[dim] = rand_unit_box();
+		}
+		p[i].v = vect(0);
 		p[i].x = x;
 		p[i].m = 1.0;
 	}
+	p[0].x[0] = -0.2499;
+	p[0].x[1] = 0.0;
+	p[0].x[2] = 0.0;
+	p[1].x[0] = +0.2499;
+	p[1].x[1] = 0.0;
+	p[1].x[2] = 0.0;
 	return p;
 }
 

@@ -4,7 +4,7 @@ using vect_int =
 general_vect<int, NDIM>;
 static real EW(real x0);
 
-constexpr int NBIN = 1000;
+constexpr int NBIN = 10000;
 static real potential[NBIN + 1];
 static real force[NBIN + 1];
 
@@ -30,29 +30,33 @@ struct ewald {
 
 ewald E;
 
-real ewald_potential(real x) {
-	if (x > 1.0 || x < 0.0) {
-		printf("Call to ewald_potential out of range %e\n", x.get());
-		abort();
+real ewald_potential(vect x) {
+	for (int dim = 0; dim < NDIM; dim++) {
+		if (x[dim] > 1.0 || x[dim] < -1.0) {
+			printf("Call to ewald_potential out of range %i %e\n", dim, x[dim].get());
+			abort();
+		}
+		if (x[dim] > 0.5) {
+			x[dim] = -(1.0 - x[dim]);
+		} else if( x[dim] < -0.5) {
+			x[dim] = -(1.0 + x[dim]);
+		}
 	}
-	if (x > 0.5) {
-		x = 1.0 - x;
-	}
+	const real r = abs(x);
 	constexpr real dx = 0.5 / (NBIN - 1);
-	const int b0 = (x / dx).get();
+	const int b0 = (r / dx).get();
 	const int b1 = b0 + 11;
-	const real w1 = (x - real(b0) * dx) / dx;
+	const real w1 = (r - real(b0) * dx) / dx;
 	const real w0 = 1.0 - w1;
-	const auto r = abs(x);
-	return -1.0 / r + potential[b0] * w0 + potential[b1] * w1;
+	return (-1.0 / r) + potential[b0] * w0 + potential[b1] * w1;
 }
 
 real ewald_separation(vect x) {
 	real d = 0.0;
 	for (int dim = 0; dim < NDIM; dim++) {
-		const real d1 = x[dim];
-		const real d2 = min(d1, x[dim] + 1.0);
-		const real d3 = min(d2, x[dim] - 1.0);
+		const real d1 = abs(x[dim]);
+		const real d2 = min(d1, abs(x[dim] + 1.0));
+		const real d3 = min(d2, abs(x[dim] - 1.0));
 		d += d3 * d3;
 	}
 	return sqrt(d);
@@ -72,15 +76,15 @@ vect ewald_location(vect x) {
 }
 
 vect ewald_force(vect x) {
-	real sgn = 1.0;
 	for (int dim = 0; dim < NDIM; dim++) {
-		if (x[dim] > 1.0 || x[dim] < 0.0) {
+		if (x[dim] > 1.0 || x[dim] < -1.0) {
 			printf("Call to ewald_force out of range %i %e\n", dim, x[dim].get());
 			abort();
 		}
 		if (x[dim] > 0.5) {
-			x[dim] = x[dim] - 1.0;
-			sgn *= -1;
+			x[dim] = -(1.0 - x[dim]);
+		} else if( x[dim] < -0.5) {
+			x[dim] = -(1.0 + x[dim]);
 		}
 	}
 	const auto r = abs(x);
@@ -90,6 +94,7 @@ vect ewald_force(vect x) {
 	const real w1 = (r - real(b0) * dx) / dx;
 	const real w0 = 1.0 - w1;
 	real fc = (force[b0] * w0 + force[b1] * w1);
+//	printf( "!!!%e %e\n", fc, r);
 	return -x / pow(r, 3) + x * fc / r;
 }
 

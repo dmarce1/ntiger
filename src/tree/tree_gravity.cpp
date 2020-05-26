@@ -132,7 +132,6 @@ mass_attr tree::get_mass_attributes() const {
 void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr> masses, fixed_real t, fixed_real dt, bool self_call) {
 	const static auto opts = options::get();
 	const auto theta = opts.theta;
-	assert(nparts0 == parts.size());
 	std::vector < hpx::future < mass_attr >> futs;
 	std::vector < hpx::future<std::array<hpx::id_type, NCHILD>> > ncfuts;
 	for (const auto &n : nids) {
@@ -192,12 +191,15 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				if (pi.t + pi.dt == t + dt || opts.global_time) {
 					for (int j = 0; j < masses.size(); j++) {
 						const auto r = pi.x - masses[j].com;
-				//		printf( "%e %e\n", pi.x[0], masses[j].com[0]);
+						//		printf( "%e %e\n", pi.x[0], masses[j].com[0]);
 						const auto rinv = 1.0 / abs(r);
 						const auto r3inv = pow(rinv, 3);
-						if( opts.ewald) {
-							pi.g = pi.g + ewald_force(r) * (G * masses[j].mtot);
-							pi.phi = pi.phi + ewald_potential(r) * G * masses[j].mtot;
+						if (opts.ewald) {
+							vect f;
+							real phi;
+							ewald_force_and_pot(r, f, phi);
+							pi.g = pi.g + f * (G * masses[j].mtot);
+							pi.phi = pi.phi + phi * G * masses[j].mtot;
 						} else {
 							pi.g = pi.g - r * (G * masses[j].mtot * r3inv);
 							pi.phi = pi.phi - G * masses[j].mtot * rinv;
@@ -223,8 +225,11 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 								const auto r2inv = rinv * rinv;
 								if (r > h) {
 									if (opts.ewald) {
-										pi.g = pi.g + ewald_force(dx) * G * pj[j].m;
-										pi.phi = pi.phi + G * ewald_potential(dx) * pj[j].m;
+										vect f;
+										real phi;
+										ewald_force_and_pot(dx, f, phi);
+										pi.g = pi.g + f * G * pj[j].m;
+										pi.phi = pi.phi + G * phi * pj[j].m;
 									} else {
 										pi.g = pi.g - (dx / r) * G * pj[j].m * r2inv;
 										pi.phi = pi.phi - G * pj[j].m * rinv;
@@ -255,7 +260,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			} else {
 				sep = abs(ZA - ZB);
 			}
-			printf( "%e\n", sep);
+			//		printf( "%e\n", sep);
 			if (sep > (rmaxA + rmaxB) / theta) {
 				masses.push_back(tmp);
 			} else if (tmp.leaf) {

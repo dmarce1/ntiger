@@ -4,7 +4,6 @@
 
 
 
-real ewald_potential(vect x);
-vect ewald_force(vect x);
+void ewald_force_and_pot(vect x, vect& f, real& phi);
 real ewald_separation(vect x);
 vect ewald_location(vect x);

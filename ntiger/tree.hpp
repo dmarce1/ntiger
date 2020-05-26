@@ -65,7 +65,6 @@ class tree: public hpx::components::component_base<tree> {
 	hpx::id_type self;
 	range root_box;
 	range box;
-	int nparts0;
 	bool leaf;
 	bool dead;
 	mass_attr mass;
@@ -118,7 +117,6 @@ public:
 		arc & self;
 		arc & root_box;
 		arc & box;
-		arc & nparts0;
 		arc & leaf;
 		arc & dead;
 		arc & mass;

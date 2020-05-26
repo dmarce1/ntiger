@@ -1,3 +1,4 @@
+#include <ntiger/ewald.hpp>
 #include <ntiger/math.hpp>
 #include <ntiger/tree.hpp>
 #include <ntiger/options.hpp>
@@ -5,19 +6,6 @@
 #include <ntiger/rand.hpp>
 
 #include <hpx/synchronization/mutex.hpp>
-
-#if(NDIM == 1 )
-constexpr real CV = 2.0;
-constexpr int NNGB = 4;
-#else
-#if( NDIM == 2 )
-constexpr real CV = M_PI;
-constexpr int NNGB = 16;
-#else
-constexpr real CV = 4.0 * M_PI / 3.0;
-constexpr int NNGB = 32;
-#endif
-#endif
 
 void tree::compute_drift(fixed_real dt) {
 	static const auto opts = options::get();
@@ -30,6 +18,9 @@ void tree::compute_drift(fixed_real dt) {
 			for (int i = 0; i < sz; i++) {
 				auto &pi = parts[i];
 				pi.x = pi.x + pi.v * double(dt);
+				if (opts.ewald) {
+					pi.x = ewald_location(pi.x);
+				}
 				if (!in_range(pi.x, box)) {
 					parent_parts.push_back(pi);
 					sz--;
@@ -123,7 +114,6 @@ void tree::virialize() {
 		hpx::wait_all(futs);
 	}
 }
-
 
 void tree::keplerize() {
 	if (leaf) {

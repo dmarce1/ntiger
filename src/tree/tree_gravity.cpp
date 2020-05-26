@@ -1,3 +1,4 @@
+#include <ntiger/ewald.hpp>
 #include <ntiger/math.hpp>
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
@@ -146,7 +147,13 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			const auto tmp = futs[i].get();
 			const auto rmaxB = min(tmp.rmaxb, tmp.rmaxs);
 			const auto ZB = tmp.com;
-			if (abs(ZA - ZB) > (rmaxA + rmaxB) / theta) {
+			real sep;
+			if (opts.ewald) {
+				sep = ewald_separation(ZA - ZB);
+			} else {
+				sep = abs(ZA - ZB);
+			}
+			if (sep > (rmaxA + rmaxB) / theta) {
 				masses.push_back(tmp);
 			} else if (tmp.leaf) {
 				near.push_back(nids[i]);
@@ -209,8 +216,13 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 								const auto rinv = 1.0 / r;
 								const auto r2inv = rinv * rinv;
 								if (r > h) {
-									pi.g = pi.g - (dx / r) * G * pj[j].m * r2inv;
-									pi.phi = pi.phi - G * pj[j].m * rinv;
+									if (opts.ewald) {
+										pi.g = pi.g - ewald_force(dx) * G * pj[j].m;
+										pi.phi = pi.phi - G * ewald_potential(r) * pj[j].m;
+									} else {
+										pi.g = pi.g - (dx / r) * G * pj[j].m * r2inv;
+										pi.phi = pi.phi - G * pj[j].m * rinv;
+									}
 								} else {
 									pi.g = pi.g - (dx / r) * G * pj[j].m * r / (h * h * h);
 									pi.phi = pi.phi - G * pj[j].m * (1.5 * h * h - 0.5 * r * r) / (h * h * h);
@@ -229,7 +241,13 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			const auto tmp = futs[i].get();
 			const auto rmaxB = min(tmp.rmaxb, tmp.rmaxs);
 			const auto ZB = tmp.com;
-			if (abs(ZA - ZB) > (rmaxA + rmaxB) / theta) {
+			real sep;
+			if (opts.ewald) {
+				sep = ewald_separation(ZA - ZB);
+			} else {
+				sep = abs(ZA - ZB);
+			}
+			if (sep > (rmaxA + rmaxB) / theta) {
 				masses.push_back(tmp);
 			} else if (tmp.leaf) {
 				leaf_nids.push_back(nids[i]);

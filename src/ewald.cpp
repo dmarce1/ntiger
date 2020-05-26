@@ -1,4 +1,4 @@
-#include <ntiger/vect.hpp>
+#include <ntiger/ewald.hpp>
 
 using vect_int =
 general_vect<int, NDIM>;
@@ -31,29 +31,66 @@ struct ewald {
 ewald E;
 
 real ewald_potential(real x) {
-	if (x > 0.5 || x < 0.0) {
-		printf("Call to ewald_potential out of range %e\n", x);
+	if (x > 1.0 || x < 0.0) {
+		printf("Call to ewald_potential out of range %e\n", x.get());
 		abort();
+	}
+	if (x > 0.5) {
+		x = 1.0 - x;
 	}
 	constexpr real dx = 0.5 / (NBIN - 1);
 	const int b0 = (x / dx).get();
 	const int b1 = b0 + 11;
 	const real w1 = (x - real(b0) * dx) / dx;
 	const real w0 = 1.0 - w1;
-	return potential[b0] * w0 + potential[b1] * w1;
+	const auto r = abs(x);
+	return -1.0 / r + potential[b0] * w0 + potential[b1] * w1;
 }
 
-real ewald_force(real x) {
-	if (x > 0.5 || x < 0.0) {
-		printf("Call to ewald_force out of range %e\n", x);
-		abort();
+real ewald_separation(vect x) {
+	real d = 0.0;
+	for (int dim = 0; dim < NDIM; dim++) {
+		const real d1 = x[dim];
+		const real d2 = min(d1, x[dim] + 1.0);
+		const real d3 = min(d2, x[dim] - 1.0);
+		d += d3 * d3;
 	}
+	return sqrt(d);
+}
+
+vect ewald_location(vect x) {
+	vect y;
+	for (int dim = 0; dim < NDIM; dim++) {
+		while (x[dim] < -0.5) {
+			x[dim] += 1.0;
+		}
+		while (x[dim] > +0.5) {
+			x[dim] -= 1.0;
+		}
+	}
+	return x;
+}
+
+vect ewald_force(vect x) {
+	real sgn = 1.0;
+	for (int dim = 0; dim < NDIM; dim++) {
+		if (x[dim] > 1.0 || x[dim] < 0.0) {
+			printf("Call to ewald_force out of range %i %e\n", dim, x[dim].get());
+			abort();
+		}
+		if (x[dim] > 0.5) {
+			x[dim] = x[dim] - 1.0;
+			sgn *= -1;
+		}
+	}
+	const auto r = abs(x);
 	constexpr real dx = 0.5 / (NBIN - 1);
-	const int b0 = (x / dx).get();
+	const int b0 = (r / dx).get();
 	const int b1 = b0 + 11;
-	const real w1 = (x - real(b0) * dx) / dx;
+	const real w1 = (r - real(b0) * dx) / dx;
 	const real w0 = 1.0 - w1;
-	return force[b0] * w0 + force[b1] * w1;
+	real fc = (force[b0] * w0 + force[b1] * w1);
+	return -x / pow(r, 3) + x * fc / r;
 }
 
 static real EW(real x0) {

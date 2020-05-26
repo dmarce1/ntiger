@@ -6,6 +6,7 @@ class options {
 public:
 	std::string config_file;
 	std::string checkpoint;
+	bool ewald;
 	bool fpe;
 	bool global_time;
 	bool gravity;
@@ -25,6 +26,7 @@ public:
 		arc & cfl;
 		arc & checkpoint;
 		arc & config_file;
+		arc & ewald;
 		arc & fpe;
 		arc & global_time;
 		arc & gravity;

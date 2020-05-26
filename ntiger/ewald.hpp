@@ -1,7 +1,10 @@
 #pragma once
 
-#include <ntiger/real.hpp>
+#include <ntiger/vect.hpp>
+
 
 
 real ewald_potential(real x);
-real ewald_force(real x);
+vect ewald_force(vect x);
+real ewald_separation(vect x);
+vect ewald_location(vect x);

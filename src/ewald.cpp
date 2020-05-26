@@ -5,30 +5,40 @@ using vect_int =
 general_vect<int, NDIM>;
 static real EW(vect);
 
-constexpr int NBIN = 16;
+constexpr int NBIN = 64;
 static std::array<std::array<std::array<real, NBIN + 1>, NBIN + 1>, NBIN + 1> potential;
 static std::array<std::array<std::array<vect, NBIN + 1>, NBIN + 1>, NBIN + 1> force;
 
 struct ewald {
 	ewald() {
 		FILE *fp = fopen("ewald.dat", "rb");
-		if (true) {
-			printf( "Found ewald.dat\n");
+		if (fp) {
+			int cnt = 0;
+			printf("Found ewald.dat\n");
 			const int sz = (NBIN + 1) * (NBIN + 1) * (NBIN + 1);
-			fread(&potential, sizeof(real), sz, fp);
-			fread(&force, sizeof(real), sz * NDIM, fp);
+			cnt += fread(&potential, sizeof(real), sz, fp);
+			cnt += fread(&force, sizeof(real), sz * NDIM, fp);
+			int expected = sz * (NDIM + 1);
+			if( cnt != expected) {
+				printf( "ewald.dat is corrupt, read %i bytes, expected %i. Remove and re-run\n", cnt, expected);
+				abort();
+			}
 			fclose(fp);
 		} else {
 			printf("ewald.dat not found\n");
-			printf("Initializing Ewald\n");
+			printf("Initializing Ewald (this may take some time)\n");
 
 			const real dx0 = 0.5 / (NBIN - 1);
 			for (int dim = 0; dim < NDIM; dim++) {
 				force[0][0][0][dim] = 0.0;
 			}
 			potential[0][0][0] = 2.8372975;
+			real n = 0;
 			for (int i = 0; i <= NBIN; i++) {
 				for (int j = 0; j <= i; j++) {
+					printf("%% %.2f complete\r", 2.0 * n.get() / double(NBIN + 2) / double(NBIN + 1) * 100.0);
+					n += 1.0;
+					fflush (stdout);
 					for (int k = 0; k <= j; k++) {
 						vect x;
 						x[0] = i * dx0;
@@ -59,7 +69,7 @@ struct ewald {
 					}
 				}
 			}
-			printf("Done initializing Ewald\n");
+			printf("\nDone initializing Ewald\n");
 			fp = fopen("ewald.dat", "wb");
 			const int sz = (NBIN + 1) * (NBIN + 1) * (NBIN + 1);
 			fwrite(&potential, sizeof(real), sz, fp);
@@ -96,7 +106,7 @@ vect ewald_location(vect x) {
 	return x;
 }
 
-void ewald_force_and_pot(vect x, vect &f, real& phi) {
+void ewald_force_and_pot(vect x, vect &f, real &phi) {
 	real sgn = 1.0;
 	for (int dim = 0; dim < NDIM; dim++) {
 		if (x[dim] > 1.0 || x[dim] < -1.0) {
@@ -119,7 +129,7 @@ void ewald_force_and_pot(vect x, vect &f, real& phi) {
 	general_vect<real, NDIM> w;
 	constexpr real dx = 0.5 / (NBIN - 1);
 	for (int dim = 0; dim < NDIM; dim++) {
-		I[dim] = (x[dim] / dx).get();
+		I[dim] = std::min(int((x[dim] / dx).get()), NBIN + 1);
 		w[dim] = x[dim] - real(I[dim]) * dx;
 	}
 	const auto w000 = w[0] * w[1] * w[2];

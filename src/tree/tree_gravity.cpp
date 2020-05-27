@@ -239,7 +239,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 									pi.phi = pi.phi - G * pj[j].m * (1.5 * h * h - 0.5 * r * r) / (h * h * h);
 								}
 							} else if (opts.ewald) {
-								pi.phi += 2.8372975;
+								pi.phi += 2.8372975 * G * pi.m;
 							}
 						}
 					}

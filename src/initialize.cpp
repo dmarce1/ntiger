@@ -71,23 +71,24 @@ std::vector<particle> kepler(int cnt) {
 }
 
 std::vector<particle> cosmos(int cnt) {
+	const int imax = pow(cnt, 1.0 / 3.0);
+	cnt = imax * imax * imax;
 	std::vector<particle> p(cnt);
-	real rmax = 1.0;
-	for (int i = 0; i < cnt; i++) {
-		vect x;
-		for( int dim = 0; dim < NDIM; dim++) {
-			x[dim] = rand_unit_box();
+	int iter = 0;
+	vect x;
+	for (int i = 0; i < imax; i++) {
+		for (int j = 0; j < imax; j++) {
+			for (int k = 0; k < imax; k++) {
+				x[0] = ((double) i + 0.5) / imax - 0.5;
+				x[1] = ((double) j + 0.5) / imax - 0.5;
+				x[2] = ((double) k + 0.5) / imax - 0.5;
+				p[iter].v = vect(0);
+				p[iter].x = x;
+				p[iter].m = 1.0 / cnt;
+				iter++;
+			}
 		}
-		p[i].v = vect(0);
-		p[i].x = x;
-		p[i].m = 1.0/ cnt;
 	}
-	p[0].x[0] = -0.25;
-	p[0].x[1] = 0.0;
-	p[0].x[2] = 0.0;
-	p[1].x[0] = +0.25;
-	p[1].x[1] = 0.0;
-	p[1].x[2] = 0.0;
 	return p;
 }
 

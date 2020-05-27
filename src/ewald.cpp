@@ -5,7 +5,7 @@ using vect_int =
 general_vect<int, NDIM>;
 static real EW(vect);
 
-constexpr int NBIN = 64;
+constexpr int NBIN = 32;
 static std::array<std::array<std::array<real, NBIN + 1>, NBIN + 1>, NBIN + 1> potential;
 static std::array<std::array<std::array<vect, NBIN + 1>, NBIN + 1>, NBIN + 1> force;
 
@@ -19,8 +19,8 @@ struct ewald {
 			cnt += fread(&potential, sizeof(real), sz, fp);
 			cnt += fread(&force, sizeof(real), sz * NDIM, fp);
 			int expected = sz * (NDIM + 1);
-			if( cnt != expected) {
-				printf( "ewald.dat is corrupt, read %i bytes, expected %i. Remove and re-run\n", cnt, expected);
+			if (cnt != expected) {
+				printf("ewald.dat is corrupt, read %i bytes, expected %i. Remove and re-run\n", cnt, expected);
 				abort();
 			}
 			fclose(fp);
@@ -28,7 +28,7 @@ struct ewald {
 			printf("ewald.dat not found\n");
 			printf("Initializing Ewald (this may take some time)\n");
 
-			const real dx0 = 0.5 / (NBIN - 1);
+			const real dx0 = 0.5 / NBIN;
 			for (int dim = 0; dim < NDIM; dim++) {
 				force[0][0][0][dim] = 0.0;
 			}
@@ -53,12 +53,13 @@ struct ewald {
 							vect yp = x;
 							yp[dim] += 0.5 * dx;
 							ym[dim] -= 0.5 * dx;
-							force[i][j][k][dim] = -(EW(yp) - EW(ym)) / dx;
-							force[j][k][i][dim] = -(EW(yp) - EW(ym)) / dx;
-							force[k][i][j][dim] = -(EW(yp) - EW(ym)) / dx;
-							force[j][i][k][dim] = -(EW(yp) - EW(ym)) / dx;
-							force[i][k][j][dim] = -(EW(yp) - EW(ym)) / dx;
-							force[k][j][i][dim] = -(EW(yp) - EW(ym)) / dx;
+							const auto f = -(EW(yp) - EW(ym)) / dx;
+							force[i][j][k][dim] = f;
+							force[j][k][i][dim] = f;
+							force[k][i][j][dim] = f;
+							force[j][i][k][dim] = f;
+							force[i][k][j][dim] = f;
+							force[k][j][i][dim] = f;
 						}
 						potential[i][j][k] = EW(x);
 						potential[j][k][i] = EW(x);
@@ -107,36 +108,30 @@ vect ewald_location(vect x) {
 }
 
 void ewald_force_and_pot(vect x, vect &f, real &phi) {
-	real sgn = 1.0;
+	const auto x0 = x;
+	vect sgn(1.0);
 	for (int dim = 0; dim < NDIM; dim++) {
-		if (x[dim] > 1.0 || x[dim] < -1.0) {
-			printf("Call to ewald_force out of range %i %e\n", dim, x[dim].get());
-			abort();
+		if (x[dim] < 0.0) {
+			x[dim] = -x[dim];
+			sgn[dim] *= -1.0;
 		}
 		if (x[dim] > 0.5) {
-			x[dim] = (1.0 - x[dim]);
-			sgn *= -1.0;
-		} else if (x[dim] < -0.5) {
-			x[dim] = 1.0 + x[dim];
-			sgn *= -1.0;
-		}
-		if (x[dim] < 0.0) {
-			x[dim] *= -1.0;
-			sgn *= -1.0;
+			x[dim] = 1.0 - x[dim];
+			sgn[dim] *= -1.0;
 		}
 	}
 	general_vect<int, NDIM> I;
 	general_vect<real, NDIM> w;
-	constexpr real dx = 0.5 / (NBIN - 1);
+	constexpr real dx = 0.5 / NBIN;
 	for (int dim = 0; dim < NDIM; dim++) {
-		I[dim] = std::min(int((x[dim] / dx).get()), NBIN + 1);
-		w[dim] = x[dim] - real(I[dim]) * dx;
+		I[dim] = std::min(int((x[dim] / dx).get()), NBIN - 1);
+		w[dim] = 1.0 - (x[dim] / dx - real(I[dim]));
 	}
 	const auto w000 = w[0] * w[1] * w[2];
 	const auto w001 = w[0] * w[1] * (1.0 - w[2]);
 	const auto w010 = w[0] * (1.0 - w[1]) * w[2];
 	const auto w011 = w[0] * (1.0 - w[1]) * (1.0 - w[2]);
-	const auto w100 = w[0] * w[1] * w[2];
+	const auto w100 = (1.0 - w[0]) * w[1] * w[1] * w[2];
 	const auto w101 = (1.0 - w[0]) * w[1] * (1.0 - w[2]);
 	const auto w110 = (1.0 - w[0]) * (1.0 - w[1]) * w[2];
 	const auto w111 = (1.0 - w[0]) * (1.0 - w[1]) * (1.0 - w[2]);
@@ -146,6 +141,8 @@ void ewald_force_and_pot(vect x, vect &f, real &phi) {
 		f[dim] += force[I[0]][I[1]][I[2] + 1][dim] * w001;
 		f[dim] += force[I[0]][I[1] + 1][I[2]][dim] * w010;
 		f[dim] += force[I[0]][I[1] + 1][I[2] + 1][dim] * w011;
+		f[dim] += force[I[0] + 1][I[1]][I[2]][dim] * w100;
+		f[dim] += force[I[0] + 1][I[1]][I[2] + 1][dim] * w101;
 		f[dim] += force[I[0] + 1][I[1] + 1][I[2]][dim] * w110;
 		f[dim] += force[I[0] + 1][I[1] + 1][I[2] + 1][dim] * w111;
 	}
@@ -154,10 +151,16 @@ void ewald_force_and_pot(vect x, vect &f, real &phi) {
 	phi += potential[I[0]][I[1]][I[2] + 1] * w001;
 	phi += potential[I[0]][I[1] + 1][I[2]] * w010;
 	phi += potential[I[0]][I[1] + 1][I[2] + 1] * w011;
+	phi += potential[I[0] + 1][I[1]][I[2]] * w100;
+	phi += potential[I[0] + 1][I[1]][I[2] + 1] * w101;
 	phi += potential[I[0] + 1][I[1] + 1][I[2]] * w110;
 	phi += potential[I[0] + 1][I[1] + 1][I[2] + 1] * w111;
 	const real r = abs(x);
-	f = f - x / pow(r, 3);
+	const real r3 = r * r * r;
+	f = f - x / r3;
+	for (int dim = 0; dim < NDIM; dim++) {
+		f[dim] *= sgn[dim];
+	}
 	phi = phi - 1.0 / r;
 }
 

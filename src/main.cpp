@@ -121,7 +121,7 @@ int hpx_main(int argc, char *argv[]) {
 			printf("%e ", s.momentum[dim].get());
 		}
 		printf("ek = %e ep = %e ev = %e verr = %e etot = %e\n", s.ek.get(), s.ep.get(), s.ev.get(), s.ev.get() / (std::abs(s.ep.get()) + 1.0e-100),
-				s.ev.get() + s.ep.get());
+				s.ek.get() + s.ep.get());
 		solve_gravity(t, dt, true);
 		drift(t, dt);
 		solve_gravity(t, dt, false);

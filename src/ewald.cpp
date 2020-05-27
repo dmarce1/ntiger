@@ -178,10 +178,10 @@ void ewald_force_and_pot(vect x, vect &f, real &phi, real h) {
 		phi += potential[I[0] + 1][I[1]][I[2] + 1] * w101;
 		phi += potential[I[0] + 1][I[1] + 1][I[2]] * w110;
 		phi += potential[I[0] + 1][I[1] + 1][I[2] + 1] * w111;
-		const real r3 = r * r * r;
 	} else {
 		phi = 2.8372975;
 	}
+	const real r3 = r * r * r;
 	if (r > h) {
 		f = f - x / r3;
 	} else {

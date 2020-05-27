@@ -220,7 +220,6 @@ tree_attr tree::finish_drift() {
 	return get_attributes();
 }
 
-
 tree_attr tree::get_attributes() const {
 	tree_attr attr;
 	attr.dead = dead;
@@ -350,23 +349,22 @@ tree_stats tree::tree_statistics() const {
 	tree_stats stats;
 	stats.max_level = 0;
 	stats.nnodes = 1;
-	stats.mass = 0.0;
 	stats.ek = 0.0;
 	stats.ep = 0.0;
 	stats.momentum = vect(0);
 	stats.ev = 0.0;
+	const real m = 1.0 / options::get().problem_size;
 	if (leaf) {
 		stats.nparts = parts.size();
 		stats.nleaves = 1;
 		for (const auto &p : parts) {
-			stats.mass += p.m;
-			const real ek = 0.5 * p.v.dot(p.v) * p.m;
-			const real ep = 0.5 * p.phi * p.m;
+			const real ek = 0.5 * p.v.dot(p.v) * m;
+			const real ep = 0.5 * p.phi * m;
 			const real ev = 2.0 * ek + ep;
 			stats.ek += ek;
 			stats.ep += ep;
 			stats.ev += ev;
-			stats.momentum = stats.momentum + p.v * p.m;
+			stats.momentum = stats.momentum + p.v * m;
 		}
 	} else {
 		stats.nparts = 0;
@@ -384,7 +382,6 @@ tree_stats tree::tree_statistics() const {
 			stats.ev += cstat.ev;
 			stats.ep += cstat.ep;
 			stats.ek += cstat.ek;
-			stats.mass += cstat.mass;
 			stats.momentum = stats.momentum + cstat.momentum;
 		}
 	}

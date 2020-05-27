@@ -1,4 +1,4 @@
-#include <ntiger/ewald.hpp>
+#include <ntiger/gravity.hpp>
 #include <ntiger/math.hpp>
 #include <ntiger/tree.hpp>
 #include <ntiger/options.hpp>

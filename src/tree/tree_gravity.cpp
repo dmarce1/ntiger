@@ -1,4 +1,4 @@
-#include <ntiger/ewald.hpp>
+#include <ntiger/gravity.hpp>
 #include <ntiger/math.hpp>
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
@@ -56,13 +56,14 @@ mass_attr tree::compute_mass_attributes() {
 	rmaxs = 0.0;
 	rmaxb = 0.0;
 	mass.leaf = leaf;
+	const real m = 1.0 / options::get().problem_size;
 	if (leaf) {
 		//PROFILE();
 		rmaxb = 0.0;
 		if (parts.size()) {
 			for (const auto &p : parts) {
-				Xcom = Xcom + p.x * p.m;
-				mtot += p.m;
+				Xcom = Xcom + p.x * m;
+				mtot += m;
 			}
 			if (mtot != 0.0) {
 				Xcom = Xcom / mtot;
@@ -70,9 +71,7 @@ mass_attr tree::compute_mass_attributes() {
 				Xcom = range_center(box);
 			}
 			for (const auto &p : parts) {
-				if (p.m != 0.0) {
-					rmaxb = max(rmaxb, h + abs(p.x - Xcom));
-				}
+				rmaxb = max(rmaxb, h + abs(p.x - Xcom));
 			}
 		}
 	} else {
@@ -115,12 +114,11 @@ mass_attr tree::compute_mass_attributes() {
 	return mass;
 }
 
-std::vector<gravity_part> tree::get_gravity_particles() const {
+std::vector<vect> tree::get_gravity_particles() const {
 	//PROFILE();
-	std::vector<gravity_part> gparts(parts.size());
+	std::vector<vect> gparts(parts.size());
 	for (int i = 0; i < parts.size(); i++) {
-		gparts[i].m = parts[i].m;
-		gparts[i].x = parts[i].x;
+		gparts[i] = parts[i].x;
 	}
 	return gparts;
 }
@@ -140,6 +138,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 	}
 	const auto rmaxA = min(mass.rmaxb, mass.rmaxs);
 	const auto ZA = mass.com;
+	const real m = 1.0 / options::get().problem_size;
 	if (leaf) {
 		std::vector < hpx::id_type > near;
 		ncfuts.clear();
@@ -184,7 +183,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		}
 		self_fut.get();
 //		printf("Getting particles\n");
-		std::vector < hpx::future<std::vector<gravity_part>> > gfuts(near.size());
+		std::vector < hpx::future<std::vector<vect>> > gfuts(near.size());
 		for (int i = 0; i < near.size(); i++) {
 			gfuts[i] = hpx::async < get_gravity_particles_action > (near[i]);
 		}
@@ -218,14 +217,14 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 			std::vector<hpx::future<void>> vfuts;
 			for (auto &n : gfuts) {
-				vfuts.push_back(hpx::async([this, t, dt, h](hpx::future<std::vector<gravity_part>> fut) {
+				vfuts.push_back(hpx::async([this, t, dt, h, m](hpx::future<std::vector<vect>> fut) {
 					PROFILE();
 					const auto pj = fut.get();
 					for (int i = 0; i < parts.size(); i++) {
 						auto &pi = parts[i];
 						if (pi.t + pi.dt == t + dt || opts.global_time) {
 							for (int j = 0; j < pj.size(); j++) {
-								const auto dx = pi.x - pj[j].x;
+								const auto dx = pi.x - pj[j];
 								const auto r = abs(dx);
 								if (r > 0.0) {
 									const auto rinv = 1.0 / r;
@@ -234,26 +233,26 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 										vect f;
 										real phi;
 										ewald_force_and_pot(dx, f, phi, h);
-										pi.g = pi.g + f * G * pj[j].m;
-										pi.phi = pi.phi + G * phi * pj[j].m;
+										pi.g = pi.g + f * G * m;
+										pi.phi = pi.phi + G * phi * m;
 									} else {
 										if (r > h) {
-											pi.g = pi.g - (dx / r) * G * pj[j].m * r2inv;
-											pi.phi = pi.phi - G * pj[j].m * rinv;
+											pi.g = pi.g - (dx / r) * G * m * r2inv;
+											pi.phi = pi.phi - G * m * rinv;
 										} else {
-											pi.g = pi.g - (dx / r) * G * pj[j].m * r / (h * h * h);
-											pi.phi = pi.phi - G * pj[j].m * (1.5 * h * h - 0.5 * r * r) / (h * h * h);
+											pi.g = pi.g - (dx / r) * G * m * r / (h * h * h);
+											pi.phi = pi.phi - G * m * (1.5 * h * h - 0.5 * r * r) / (h * h * h);
 										}
 									}
 								} else if (opts.ewald) {
-									pi.phi += 2.8372975 * G * pi.m;
+									pi.phi += 2.8372975 * G * m;
 								}
 							}
 						}
 					}
 				}, std::move(n)));
 			}
-			hpx::wait_all (vfuts);
+			hpx::wait_all(vfuts);
 		}
 //		printf( "Waiting for near interactions\n");
 	} else {

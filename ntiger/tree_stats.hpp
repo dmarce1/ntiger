@@ -9,7 +9,6 @@ struct tree_stats {
 	int nnodes;
 	int nleaves;
 	int nparts;
-	real mass;
 	real ek;
 	real ep;
 	real ev;;
@@ -21,7 +20,6 @@ struct tree_stats {
 		arc & nnodes;
 		arc & nleaves;
 		arc & nparts;
-		arc & mass;
 		arc & ek;
 		arc & ep;
 		arc & ev;

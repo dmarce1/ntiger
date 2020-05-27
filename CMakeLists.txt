@@ -22,7 +22,7 @@ find_package(Silo REQUIRED)
 find_package(Boost REQUIRED)
 
 set(common_source_files
-    src/ewald.cpp
+    src/gravity.cpp
 	src/math.cpp
 	src/particle.cpp
 	src/rand.cpp
@@ -54,11 +54,9 @@ set(common_header_files
 	ntiger/particle.hpp
 	ntiger/real.hpp
 	ntiger/vect.hpp
+	ntiger/gravity.hpp
 )
 
-set(ewald_header_files
-	ntiger/ewald.hpp
-)
 
 set(ntiger_header_files
 	ntiger/initialize.hpp

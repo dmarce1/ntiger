@@ -31,7 +31,7 @@ void drift(fixed_real t, fixed_real dt) {
 //		printf( "statistics\n" );
 		const auto s = tree::tree_statistics_action()(root);
 //		printf( "boost\n" );
-		tree::apply_boost_action()(root, -s.momentum/s.mass);
+		tree::apply_boost_action()(root, -s.momentum);
 	}
 //	printf( "redistributed\n");
 	tree::redistribute_workload_action()(root, 0, tree::compute_workload_action()(root));
@@ -132,8 +132,8 @@ int hpx_main(int argc, char *argv[]) {
 		printf("statistics\n");
 		auto s = statistics();
 
-		printf("Step = %i t = %13.6e  dt = %13.6e Nparts = %i Nleaves = %i Max Level = %i Mass = %13.6e Momentum = ", i, double(t), double(dt), s.nparts, s.nleaves,
-				s.max_level, s.mass.get());
+		printf("Step = %i t = %13.6e  dt = %13.6e Nparts = %i Nleaves = %i Max Level = %i  Momentum = ", i, double(t), double(dt), s.nparts, s.nleaves,
+				s.max_level);
 		for (int dim = 0; dim < NDIM; dim++) {
 			printf("%13.6e ", s.momentum[dim].get());
 		}

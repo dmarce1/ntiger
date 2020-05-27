@@ -1,4 +1,4 @@
-#include <ntiger/ewald.hpp>
+#include <ntiger/gravity.hpp>
 #include <cstdio>
 
 int main() {

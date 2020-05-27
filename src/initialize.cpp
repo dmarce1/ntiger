@@ -16,7 +16,6 @@ std::vector<particle> plummer(int cnt) {
 			rho = pow(1.0 + r * r, -5.0 / 2.0);
 		} while (rand1() > rho);
 		p[i].x = x;
-		p[i].m = 1.0;
 	}
 	return p;
 }
@@ -35,7 +34,6 @@ std::vector<particle> toomre1(int cnt) {
 			x[2] = rand_normal() * rand_sign() * 0.001;
 		} while (rand1() > rho);
 		p[i].x = x;
-		p[i].m = 1.0;
 	}
 	return p;
 }
@@ -43,7 +41,6 @@ std::vector<particle> toomre1(int cnt) {
 std::vector<particle> kepler(int cnt) {
 	std::vector<particle> parts(cnt);
 	const auto m = 1.0e-3 / cnt;
-	parts[0].m = 1.0;
 	parts[0].v = vect(0);
 	parts[0].x = vect(0);
 	for (int i = 1; i < cnt; i++) {
@@ -55,7 +52,6 @@ std::vector<particle> kepler(int cnt) {
 			const auto rsqrrinv = 1.0 / (r * sqrt(r));
 			auto &p = parts[i];
 			if (r < 0.5 && r > 0.1) {
-				p.m = 0.0;
 				p.x[0] = x;
 				p.x[1] = y;
 				p.v[0] = -y * rsqrrinv;
@@ -79,7 +75,6 @@ std::vector<particle> cosmos(int cnt) {
 		}
 		p[i].v = vect(0);
 		p[i].x = x;
-		p[i].m = 1.0/ cnt;
 	}
 
 //	int N = pow(cnt,1.0/3.0);

@@ -93,7 +93,7 @@ public:
 	tree_attr finish_drift();
 	tree_attr get_attributes() const;
 	std::array<hpx::id_type, NCHILD> get_children() const;
-	std::vector<gravity_part> get_gravity_particles() const;
+	std::vector<vect> get_gravity_particles() const;
 	mass_attr get_mass_attributes() const;
 	hpx::id_type get_parent() const;
 	void rescale(real factor, range mybox);

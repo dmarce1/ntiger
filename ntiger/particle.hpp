@@ -13,7 +13,6 @@
 #include <vector>
 
 struct particle {
-	real m;
 	real phi;
 	vect x;
 	vect v;
@@ -26,7 +25,6 @@ struct particle {
 	void serialize(Arc &&a, unsigned) {
 		a & t;
 		a & dt;
-		a & m;
 		a & v;
 		a & g;
 		a & x;
@@ -38,15 +36,5 @@ struct particle {
 };
 
 
-
-struct gravity_part {
-	real m;
-	vect x;
-	template<class Arc>
-	void serialize(Arc &&arc, unsigned) {
-		arc & m;
-		arc & x;
-	}
-};
 
 #endif /* SRC_PARTICLE_HPP_ */

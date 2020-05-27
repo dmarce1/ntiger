@@ -132,6 +132,7 @@ mass_attr tree::get_mass_attributes() const {
 void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr> masses, fixed_real t, fixed_real dt, bool self_call) {
 	const static auto opts = options::get();
 	const auto theta = opts.theta;
+	const auto h = options::get().kernel_size;
 	std::vector < hpx::future < mass_attr >> futs;
 	std::vector < hpx::future<std::array<hpx::id_type, NCHILD>> > ncfuts;
 	for (const auto &n : nids) {
@@ -197,7 +198,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 						if (opts.ewald) {
 							vect f;
 							real phi;
-							ewald_force_and_pot(r, f, phi);
+							ewald_force_and_pot(r, f, phi, h);
 							pi.g = pi.g + f * (G * masses[j].mtot);
 							pi.phi = pi.phi + phi * G * masses[j].mtot;
 						} else {
@@ -210,10 +211,9 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		}
 		std::vector<hpx::future<void>> vfuts;
 		for (auto &n : gfuts) {
-			vfuts.push_back(hpx::async([this, t, dt](hpx::future<std::vector<gravity_part>> fut) {
+			vfuts.push_back(hpx::async([this, t, dt, h](hpx::future<std::vector<gravity_part>> fut) {
 				PROFILE();
 				const auto pj = fut.get();
-				const auto h = options::get().kernel_size;
 				for (int i = 0; i < parts.size(); i++) {
 					auto &pi = parts[i];
 					if (pi.t + pi.dt == t + dt || opts.global_time) {
@@ -223,20 +223,20 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 							if (r > 0.0) {
 								const auto rinv = 1.0 / r;
 								const auto r2inv = rinv * rinv;
-								if (r > h) {
-									if (opts.ewald) {
-										vect f;
-										real phi;
-										ewald_force_and_pot(dx, f, phi);
-										pi.g = pi.g + f * G * pj[j].m;
-										pi.phi = pi.phi + G * phi * pj[j].m;
-									} else {
+								if (opts.ewald) {
+									vect f;
+									real phi;
+									ewald_force_and_pot(dx, f, phi, h);
+									pi.g = pi.g + f * G * pj[j].m;
+									pi.phi = pi.phi + G * phi * pj[j].m;
+								} else {
+									if (r > h) {
 										pi.g = pi.g - (dx / r) * G * pj[j].m * r2inv;
 										pi.phi = pi.phi - G * pj[j].m * rinv;
+									} else {
+										pi.g = pi.g - (dx / r) * G * pj[j].m * r / (h * h * h);
+										pi.phi = pi.phi - G * pj[j].m * (1.5 * h * h - 0.5 * r * r) / (h * h * h);
 									}
-								} else {
-									pi.g = pi.g - (dx / r) * G * pj[j].m * r / (h * h * h);
-									pi.phi = pi.phi - G * pj[j].m * (1.5 * h * h - 0.5 * r * r) / (h * h * h);
 								}
 							} else if (opts.ewald) {
 								pi.phi += 2.8372975 * G * pi.m;

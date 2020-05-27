@@ -5,7 +5,7 @@ using vect_int =
 general_vect<int, NDIM>;
 static real EW(vect);
 
-constexpr int NBIN = 64;
+constexpr int NBIN = 128;
 static std::array<std::array<std::array<real, NBIN + 1>, NBIN + 1>, NBIN + 1> potential;
 static std::array<std::array<std::array<vect, NBIN + 1>, NBIN + 1>, NBIN + 1> force;
 
@@ -125,7 +125,7 @@ vect ewald_location(vect x) {
 	return x;
 }
 
-void ewald_force_and_pot(vect x, vect &f, real &phi) {
+void ewald_force_and_pot(vect x, vect &f, real &phi, real h) {
 	const auto x0 = x;
 	vect sgn(1.0);
 	for (int dim = 0; dim < NDIM; dim++) {
@@ -176,12 +176,20 @@ void ewald_force_and_pot(vect x, vect &f, real &phi) {
 	const real r = abs(x);
 	const real r3 = r * r * r;
 //	printf( "%e %e %e %e \n", f[0], -x[0]/r3,f[1],  -x[1]/r3);
-	f = f - x / r3;
 //	abort();
+	if (r > h) {
+		f = f - x / r3;
+	} else {
+		f = f - x / (h * h * h);
+	}
 	for (int dim = 0; dim < NDIM; dim++) {
 		f[dim] *= sgn[dim];
 	}
-	phi = phi - 1.0 / r;
+	if (r > h) {
+		phi = phi - 1.0 / r;
+	} else {
+		phi = phi - (1.5 * h * h - 0.5 * r * r) / (h * h * h);
+	}
 }
 
 static real EW(vect x) {

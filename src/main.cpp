@@ -32,7 +32,7 @@ void drift(fixed_real t, fixed_real dt) {
 void rescale() {
 	const auto new_scale = tree::compute_scale_factor_action()(root);
 	if (new_scale > 1.0) {
-		printf("Re-scaling by %e\n", new_scale.get());
+		printf("Re-scaling by %13.6e\n", new_scale.get());
 		tree::rescale_action()(root, new_scale, range());
 		tree::compute_drift_action()(root, 0.0);
 		tree::finish_drift_action()(root);
@@ -115,12 +115,12 @@ int hpx_main(int argc, char *argv[]) {
 	while (t < fixed_real(opts.tmax)) {
 		auto s = statistics();
 
-		printf("Step = %i t = %e  dt = %e Nparts = %i Nleaves = %i Max Level = %i Mass = %e Momentum = ", i, double(t), double(dt), s.nparts, s.nleaves,
+		printf("Step = %i t = %13.6e  dt = %13.6e Nparts = %i Nleaves = %i Max Level = %i Mass = %13.6e Momentum = ", i, double(t), double(dt), s.nparts, s.nleaves,
 				s.max_level, s.mass.get());
 		for (int dim = 0; dim < NDIM; dim++) {
-			printf("%e ", s.momentum[dim].get());
+			printf("%13.6e ", s.momentum[dim].get());
 		}
-		printf("ek = %e ep = %e ev = %e verr = %e etot = %e\n", s.ek.get(), s.ep.get(), s.ev.get(), s.ev.get() / (std::abs(s.ep.get()) + 1.0e-100),
+		printf("ek = %13.6e ep = %13.6e ev = %13.6e verr = %13.6e etot = %13.6e\n", s.ek.get(), s.ep.get(), s.ev.get(), s.ev.get() / (std::abs(s.ep.get()) + 1.0e-100),
 				s.ek.get() + s.ep.get());
 		solve_gravity(t, dt, true);
 		drift(t, dt);

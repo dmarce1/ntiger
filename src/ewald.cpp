@@ -5,7 +5,7 @@ using vect_int =
 general_vect<int, NDIM>;
 static real EW(vect);
 
-constexpr int NBIN = 32;
+constexpr int NBIN = 64;
 static std::array<std::array<std::array<real, NBIN + 1>, NBIN + 1>, NBIN + 1> potential;
 static std::array<std::array<std::array<vect, NBIN + 1>, NBIN + 1>, NBIN + 1> force;
 
@@ -35,11 +35,11 @@ struct ewald {
 			potential[0][0][0] = 2.8372975;
 			real n = 0;
 			for (int i = 0; i <= NBIN; i++) {
-				for (int j = 0; j <= i; j++) {
-					printf("%% %.2f complete\r", 2.0 * n.get() / double(NBIN + 2) / double(NBIN + 1) * 100.0);
+				for (int j = 0; j <= NBIN; j++) {
+					printf("%% %.2f complete\r", n.get() / double(NBIN +1) / double(NBIN + 1) * 100.0);
 					n += 1.0;
 					fflush (stdout);
-					for (int k = 0; k <= j; k++) {
+					for (int k = 0; k <= NBIN; k++) {
 						vect x;
 						x[0] = i * dx0;
 						x[1] = j * dx0;
@@ -55,18 +55,8 @@ struct ewald {
 							ym[dim] -= 0.5 * dx;
 							const auto f = -(EW(yp) - EW(ym)) / dx;
 							force[i][j][k][dim] = f;
-							force[j][k][i][dim] = f;
-							force[k][i][j][dim] = f;
-							force[j][i][k][dim] = f;
-							force[i][k][j][dim] = f;
-							force[k][j][i][dim] = f;
 						}
 						potential[i][j][k] = EW(x);
-						potential[j][k][i] = EW(x);
-						potential[k][i][j] = EW(x);
-						potential[j][i][k] = EW(x);
-						potential[i][k][j] = EW(x);
-						potential[k][j][i] = EW(x);
 					}
 				}
 			}
@@ -157,7 +147,9 @@ void ewald_force_and_pot(vect x, vect &f, real &phi) {
 	phi += potential[I[0] + 1][I[1] + 1][I[2] + 1] * w111;
 	const real r = abs(x);
 	const real r3 = r * r * r;
+//	printf( "%e %e %e %e \n", f[0], -x[0]/r3,f[1],  -x[1]/r3);
 	f = f - x / r3;
+//	abort();
 	for (int dim = 0; dim < NDIM; dim++) {
 		f[dim] *= sgn[dim];
 	}

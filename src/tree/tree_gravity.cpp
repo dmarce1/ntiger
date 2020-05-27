@@ -214,46 +214,48 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				}
 			}
 		}
-
-		std::vector<hpx::future<void>> vfuts;
-		for (auto &n : gfuts) {
-			vfuts.push_back(hpx::async([this, t, dt, h](hpx::future<std::vector<gravity_part>> fut) {
-				PROFILE();
-				const auto pj = fut.get();
-				for (int i = 0; i < parts.size(); i++) {
-					auto &pi = parts[i];
-					if (pi.t + pi.dt == t + dt || opts.global_time) {
-						for (int j = 0; j < pj.size(); j++) {
-							const auto dx = pi.x - pj[j].x;
-							const auto r = abs(dx);
-							if (r > 0.0) {
-								const auto rinv = 1.0 / r;
-								const auto r2inv = rinv * rinv;
-								if (opts.ewald) {
-									vect f;
-									real phi;
-									ewald_force_and_pot(dx, f, phi, h);
-									pi.g = pi.g + f * G * pj[j].m;
-									pi.phi = pi.phi + G * phi * pj[j].m;
-								} else {
-									if (r > h) {
-										pi.g = pi.g - (dx / r) * G * pj[j].m * r2inv;
-										pi.phi = pi.phi - G * pj[j].m * rinv;
+		{
+			std::lock_guard < hpx::lcos::local::mutex > lock(mtx);
+			std::vector<hpx::future<void>> vfuts;
+			for (auto &n : gfuts) {
+				vfuts.push_back(hpx::async([this, t, dt, h](hpx::future<std::vector<gravity_part>> fut) {
+					PROFILE();
+					const auto pj = fut.get();
+					for (int i = 0; i < parts.size(); i++) {
+						auto &pi = parts[i];
+						if (pi.t + pi.dt == t + dt || opts.global_time) {
+							for (int j = 0; j < pj.size(); j++) {
+								const auto dx = pi.x - pj[j].x;
+								const auto r = abs(dx);
+								if (r > 0.0) {
+									const auto rinv = 1.0 / r;
+									const auto r2inv = rinv * rinv;
+									if (opts.ewald) {
+										vect f;
+										real phi;
+										ewald_force_and_pot(dx, f, phi, h);
+										pi.g = pi.g + f * G * pj[j].m;
+										pi.phi = pi.phi + G * phi * pj[j].m;
 									} else {
-										pi.g = pi.g - (dx / r) * G * pj[j].m * r / (h * h * h);
-										pi.phi = pi.phi - G * pj[j].m * (1.5 * h * h - 0.5 * r * r) / (h * h * h);
+										if (r > h) {
+											pi.g = pi.g - (dx / r) * G * pj[j].m * r2inv;
+											pi.phi = pi.phi - G * pj[j].m * rinv;
+										} else {
+											pi.g = pi.g - (dx / r) * G * pj[j].m * r / (h * h * h);
+											pi.phi = pi.phi - G * pj[j].m * (1.5 * h * h - 0.5 * r * r) / (h * h * h);
+										}
 									}
+								} else if (opts.ewald) {
+									pi.phi += 2.8372975 * G * pi.m;
 								}
-							} else if (opts.ewald) {
-								pi.phi += 2.8372975 * G * pi.m;
 							}
 						}
 					}
-				}
-			}, std::move(n)));
+				}, std::move(n)));
+			}
 		}
 //		printf( "Waiting for near interactions\n");
-		hpx::wait_all(vfuts);
+		hpx::wait_all (vfuts);
 	} else {
 		std::array<hpx::future<void>, NCHILD> cfuts;
 		std::vector < hpx::id_type > leaf_nids;

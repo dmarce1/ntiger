@@ -215,7 +215,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			}
 		}
 		{
-			std::lock_guard < hpx::lcos::local::mutex > lock(mtx);
+			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 			std::vector<hpx::future<void>> vfuts;
 			for (auto &n : gfuts) {
 				vfuts.push_back(hpx::async([this, t, dt, h](hpx::future<std::vector<gravity_part>> fut) {

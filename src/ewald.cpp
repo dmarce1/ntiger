@@ -35,11 +35,11 @@ struct ewald {
 			potential[0][0][0] = 2.8372975;
 			real n = 0;
 			for (int i = 0; i <= NBIN; i++) {
-				for (int j = 0; j <= NBIN; j++) {
-					printf("%% %.2f complete\r", n.get() / double(NBIN +1) / double(NBIN + 1) * 100.0);
+				for (int j = 0; j <= i; j++) {
+					printf("%% %.2f complete\r", 2.0 * n.get() / double(NBIN + 2) / double(NBIN + 1) * 100.0);
 					n += 1.0;
 					fflush (stdout);
-					for (int k = 0; k <= NBIN; k++) {
+					for (int k = 0; k <= j; k++) {
 						vect x;
 						x[0] = i * dx0;
 						x[1] = j * dx0;
@@ -47,7 +47,7 @@ struct ewald {
 						if (x.dot(x) == 0.0) {
 							continue;
 						}
-						const real dx = 0.01 * dx0;
+						const real dx = 0.001 * dx0;
 						for (int dim = 0; dim < NDIM; dim++) {
 							vect ym = x;
 							vect yp = x;
@@ -56,7 +56,35 @@ struct ewald {
 							const auto f = -(EW(yp) - EW(ym)) / dx;
 							force[i][j][k][dim] = f;
 						}
-						potential[i][j][k] = EW(x);
+						const auto f = force[i][j][k];
+						force[i][k][j][0] = f[0];
+						force[i][k][j][1] = f[2];
+						force[i][k][j][2] = f[1];
+
+						force[j][i][k][0] = f[1];
+						force[j][i][k][1] = f[0];
+						force[j][i][k][2] = f[2];
+
+						force[j][k][i][0] = f[1];
+						force[j][k][i][1] = f[2];
+						force[j][k][i][2] = f[0];
+
+						force[k][i][j][0] = f[2];
+						force[k][i][j][1] = f[0];
+						force[k][i][j][2] = f[1];
+
+						force[k][j][i][0] = f[2];
+						force[k][j][i][1] = f[1];
+						force[k][j][i][2] = f[0];
+
+						const auto p = EW(x);
+
+						potential[i][j][k] = p;
+						potential[i][k][j] = p;
+						potential[j][i][k] = p;
+						potential[j][k][i] = p;
+						potential[k][i][j] = p;
+						potential[k][j][i] = p;
 					}
 				}
 			}

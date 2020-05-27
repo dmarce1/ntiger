@@ -136,6 +136,7 @@ public:
 	HPX_DEFINE_COMPONENT_ACTION(tree,rescale);
 	HPX_DEFINE_COMPONENT_ACTION(tree,redistribute_workload);
 	HPX_DEFINE_COMPONENT_ACTION(tree,send_lost_parts);
+	HPX_DEFINE_COMPONENT_ACTION(tree,set_self_and_parent);
 	HPX_DEFINE_COMPONENT_ACTION(tree,tree_statistics);
 	HPX_DEFINE_COMPONENT_ACTION(tree,write_checkpoint);
 	HPX_DEFINE_COMPONENT_ACTION(tree,write_silo);
@@ -149,7 +150,6 @@ public:
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_parent);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_children);
 	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,send_particles);
-	HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_self_and_parent);
 
 };
 

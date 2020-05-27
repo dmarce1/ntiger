@@ -253,9 +253,9 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 					}
 				}, std::move(n)));
 			}
+			hpx::wait_all (vfuts);
 		}
 //		printf( "Waiting for near interactions\n");
-		hpx::wait_all (vfuts);
 	} else {
 		std::array<hpx::future<void>, NCHILD> cfuts;
 		std::vector < hpx::id_type > leaf_nids;

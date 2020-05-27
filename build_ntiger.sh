@@ -17,6 +17,7 @@ rm -r CMakeFiles
 
 cmake -DCMAKE_PREFIX_PATH="$HOME/local/$1/hpx" -DCMAKE_CXX_FLAGS="-DBOOST_USE_VALGRIND" \
       -DCMAKE_CXX_COMPILER=g++  \
+-DPAPI_LIBRARY="/work/dmarce1/PowerTiger/build/papi/lib/libpapi.a"\
       -DCMAKE_C_COMPILER=gcc \
       -DCMAKE_CXX_FLAGS="" \
       -DCMAKE_C_FLAGS="" \

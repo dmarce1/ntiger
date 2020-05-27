@@ -8,31 +8,41 @@ hpx::id_type root;
 
 void solve_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 	static const auto opts = options::get();
-	if (opts.gravity || !first_kick) {
+	if (opts.gravity && !first_kick) {
+//		printf( "Multipoles\n" );
 		tree::compute_mass_attributes_action()(root);
+//		printf( "Interactions\n" );
 		tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
 	}
+//	printf( "Applying\n" );
 	if (opts.problem == "kepler" || opts.problem == "rt" || opts.gravity) {
 		tree::apply_gravity_action()(root, t, dt, first_kick);
 	}
 }
 
 void drift(fixed_real t, fixed_real dt) {
+	
 	const auto opts = options::get();
+//	printf( "Drift1\n" );
 	tree::compute_drift_action()(root, dt);
+//	printf( "Drift2\n" );
 	tree::finish_drift_action()(root);
-	if (opts.ewald) {
+	if (opts.ewald && dt != fixed_real(0.0)) {
+//		printf( "statistics\n" );
 		const auto s = tree::tree_statistics_action()(root);
+//		printf( "boost\n" );
 		tree::apply_boost_action()(root, -s.momentum/s.mass);
 	}
+//	printf( "redistributed\n");
 	tree::redistribute_workload_action()(root, 0, tree::compute_workload_action()(root));
+//	printf( "Set selfand parent\n");
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
 }
 
 void rescale() {
 	const auto new_scale = tree::compute_scale_factor_action()(root);
 	if (new_scale > 1.0) {
-		printf("Re-scaling by %13.6e\n", new_scale.get());
+//		printf("Re-scaling by %13.6e\n", new_scale.get());
 		tree::rescale_action()(root, new_scale, range());
 		tree::compute_drift_action()(root, 0.0);
 		tree::finish_drift_action()(root);
@@ -101,18 +111,25 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	root = hpx::new_ < tree > (hpx::find_here(), std::move(parts), box, null_range()).get();
 	init(t, t0);
+	printf("Initial load balance\n" );
+	drift(t, 0.0);
+	printf("Initial gravity solve\n" );
 	solve_gravity(t, 0.0, false);
 	if (opts.problem == "plummer") {
 		tree::virialize_action()(root);
 	} else if (opts.problem == "toomre") {
 		tree::keplerize_action()(root);
 	}
+	printf( "Time-step\n");
 	fixed_real dt = timestep(t);
+	printf( "Start writing\n");
 	write_checkpoint(0, t);
+	printf( "Done writing\n");
 	int oi = 0;
 	int i = 0;
 	fixed_real last_output = 0.0;
 	while (t < fixed_real(opts.tmax)) {
+		printf("statistics\n");
 		auto s = statistics();
 
 		printf("Step = %i t = %13.6e  dt = %13.6e Nparts = %i Nleaves = %i Max Level = %i Mass = %13.6e Momentum = ", i, double(t), double(dt), s.nparts, s.nleaves,
@@ -122,9 +139,13 @@ int hpx_main(int argc, char *argv[]) {
 		}
 		printf("ek = %13.6e ep = %13.6e ev = %13.6e verr = %13.6e etot = %13.6e\n", s.ek.get(), s.ep.get(), s.ev.get(), s.ev.get() / (std::abs(s.ep.get()) + 1.0e-100),
 				s.ek.get() + s.ep.get());
+		printf( "gravity\n" );
 		solve_gravity(t, dt, true);
+		printf( "drift\n" );
 		drift(t, dt);
+		printf( "gravity\n" );
 		solve_gravity(t, dt, false);
+		printf( "rescale\n" );
 		rescale();
 		t += dt;
 		if (int((last_output / fixed_real(opts.output_freq))) != int(((t / fixed_real(opts.output_freq))))) {
@@ -132,6 +153,7 @@ int hpx_main(int argc, char *argv[]) {
 			write_checkpoint(++oi, t);
 			printf("output %i\n", oi);
 		}
+		printf( "timestep\n");
 		dt = timestep(t);
 		i++;
 	}

@@ -143,6 +143,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 	if (leaf) {
 		std::vector < hpx::id_type > near;
 		ncfuts.clear();
+//		printf( "Getting masses\n");
 		for (int i = 0; i < nids.size(); i++) {
 			const auto tmp = futs[i].get();
 			const auto rmaxB = min(tmp.rmaxb, tmp.rmaxs);
@@ -176,16 +177,20 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		}
 		hpx::future<void> self_fut;
 		if (nids.size()) {
+//			printf( "Self call\n");
 			self_fut = hpx::async < compute_gravity_action > (self, nids, std::vector<mass_attr>(), t, dt, true);
 		} else {
 			self_fut = hpx::make_ready_future<void>();
 		}
 		self_fut.get();
+//		printf("Getting particles\n");
 		std::vector < hpx::future<std::vector<gravity_part>> > gfuts(near.size());
 		for (int i = 0; i < near.size(); i++) {
 			gfuts[i] = hpx::async < get_gravity_particles_action > (near[i]);
 		}
 		{
+//		printf("Doing far interactions\n");
+
 			PROFILE();
 			for (int i = 0; i < parts.size(); i++) {
 				auto &pi = parts[i];
@@ -209,6 +214,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				}
 			}
 		}
+
 		std::vector<hpx::future<void>> vfuts;
 		for (auto &n : gfuts) {
 			vfuts.push_back(hpx::async([this, t, dt, h](hpx::future<std::vector<gravity_part>> fut) {
@@ -246,6 +252,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				}
 			}, std::move(n)));
 		}
+//		printf( "Waiting for near interactions\n");
 		hpx::wait_all(vfuts);
 	} else {
 		std::array<hpx::future<void>, NCHILD> cfuts;

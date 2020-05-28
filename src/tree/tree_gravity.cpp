@@ -187,73 +187,49 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		for (int i = 0; i < near.size(); i++) {
 			gfuts[i] = hpx::async < get_gravity_particles_action > (near[i]);
 		}
-		{
-//		printf("Doing far interactions\n");
 
-			PROFILE();
+		std::vector<vect> activeX;
+		std::vector<source> sources;
+		for (int i = 0; i < parts.size(); i++) {
+			if (parts[i].t + parts[i].dt == t + dt) {
+				activeX.push_back(parts[i].x);
+			}
+		}
+		for (int i = 0; i < masses.size(); i++) {
+			source s;
+			s.x = masses[i].com;
+			s.m = masses[i].mtot;
+			sources.push_back(s);
+		}
+		const auto g = gravity_far(activeX, sources);
+		{
+			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
+			int j = 0;
 			for (int i = 0; i < parts.size(); i++) {
-				auto &pi = parts[i];
-				if (pi.t + pi.dt == t + dt || opts.global_time) {
-					for (int j = 0; j < masses.size(); j++) {
-						const auto r = pi.x - masses[j].com;
-						//		printf( "%e %e\n", pi.x[0], masses[j].com[0]);
-						const auto rinv = 1.0 / abs(r);
-						const auto r3inv = pow(rinv, 3);
-						if (opts.ewald) {
-							vect f;
-							real phi;
-							ewald_force_and_pot(r, f, phi, h);
-							pi.g = pi.g + f * (G * masses[j].mtot);
-							pi.phi = pi.phi + phi * G * masses[j].mtot;
-						} else {
-							pi.g = pi.g - r * (G * masses[j].mtot * r3inv);
-							pi.phi = pi.phi - G * masses[j].mtot * rinv;
-						}
-					}
+				if (parts[i].t + parts[i].dt == t + dt) {
+					parts[i].g = parts[i].g + g[j].g;
+					parts[i].phi += g[j].phi;
+					j++;
 				}
 			}
 		}
-		{
-			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
-			std::vector<hpx::future<void>> vfuts;
-			for (auto &n : gfuts) {
-				vfuts.push_back(hpx::async([this, t, dt, h, m](hpx::future<std::vector<vect>> fut) {
-					PROFILE();
-					const auto pj = fut.get();
-					for (int i = 0; i < parts.size(); i++) {
-						auto &pi = parts[i];
-						if (pi.t + pi.dt == t + dt || opts.global_time) {
-							for (int j = 0; j < pj.size(); j++) {
-								const auto dx = pi.x - pj[j];
-								const auto r = abs(dx);
-								if (r > 0.0) {
-									const auto rinv = 1.0 / r;
-									const auto r2inv = rinv * rinv;
-									if (opts.ewald) {
-										vect f;
-										real phi;
-										ewald_force_and_pot(dx, f, phi, h);
-										pi.g = pi.g + f * G * m;
-										pi.phi = pi.phi + G * phi * m;
-									} else {
-										if (r > h) {
-											pi.g = pi.g - (dx / r) * G * m * r2inv;
-											pi.phi = pi.phi - G * m * rinv;
-										} else {
-											pi.g = pi.g - (dx / r) * G * m * r / (h * h * h);
-											pi.phi = pi.phi - G * m * (1.5 * h * h - 0.5 * r * r) / (h * h * h);
-										}
-									}
-								} else if (opts.ewald) {
-									pi.phi += 2.8372975 * G * m;
-								}
-							}
-						}
+		std::vector<hpx::future<void>> vfuts;
+		for (auto &n : gfuts) {
+			vfuts.push_back(hpx::async([this, t, dt, h, m,&activeX](hpx::future<std::vector<vect>> fut) {
+				const auto pj = fut.get();
+				const auto g = gravity_near(activeX, pj);
+				std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
+				int j = 0;
+				for (int i = 0; i < parts.size(); i++) {
+					if (parts[i].t + parts[i].dt == t + dt) {
+						parts[i].g = parts[i].g + g[j].g;
+						parts[i].phi += g[j].phi;
+						j++;
 					}
-				}, std::move(n)));
-			}
-			hpx::wait_all(vfuts);
+				}
+			}, std::move(n)));
 		}
+		hpx::wait_all(vfuts);
 //		printf( "Waiting for near interactions\n");
 	} else {
 		std::array<hpx::future<void>, NCHILD> cfuts;

@@ -13,6 +13,7 @@ cmake_policy(SET CMP0003 NEW)
 cmake_policy(SET CMP0074 NEW)
 
 project(ntiger CXX)
+enable_language(CUDA)
 
 # Search path for CMake modules to be loaded by include() and find_package()
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -23,14 +24,11 @@ find_package(Boost REQUIRED)
 
 set(common_source_files
     src/gravity.cpp
+    src/gravity_cuda.cu
 	src/math.cpp
 	src/particle.cpp
 	src/rand.cpp
 	src/options.cpp
-)
-
-set(ewald_source_files
-	src/ewald_main.cpp
 )
 
 set(ntiger_source_files
@@ -95,20 +93,8 @@ add_hpx_executable(
     ${check2silo_header_files}
 )
 
-add_hpx_executable(
-  ewald
-  DEPENDENCIES
-    Silo::silo Boost::boost ntigerlib
-  SOURCES
-    ${ewald_source_files}
-  HEADERS
-    ${ewald_header_files}
-)
-
-target_compile_options(ntigerlib PUBLIC -std=c++1z)
 target_include_directories(ntigerlib PUBLIC ${PROJECT_SOURCE_DIR})
 target_include_directories(ntiger PUBLIC ${PROJECT_SOURCE_DIR})
 target_include_directories(check2silo PUBLIC ${PROJECT_SOURCE_DIR})
-target_include_directories(ewald PUBLIC ${PROJECT_SOURCE_DIR})
 
 

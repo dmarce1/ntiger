@@ -47,6 +47,7 @@ set(check2silo_source_files
 )
 
 set(common_header_files
+	ntiger/cuda_export.hpp
 	ntiger/dim.hpp
 	ntiger/options.hpp
 	ntiger/particle.hpp

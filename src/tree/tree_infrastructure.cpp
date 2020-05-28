@@ -4,7 +4,7 @@
 #include <ntiger/tree.hpp>
 
 #include  <hpx/lcos/when_all.hpp>
-#include <hpx/synchronization/mutex.hpp>
+#include <hpx/lcos/local/mutex.hpp>
 
 #include <set>
 

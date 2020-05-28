@@ -6,6 +6,7 @@ class options {
 public:
 	std::string config_file;
 	std::string checkpoint;
+	bool cuda;
 	bool ewald;
 	bool fpe;
 	bool global_time;
@@ -24,6 +25,7 @@ public:
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
 		arc & cfl;
+		arc & cuda;
 		arc & checkpoint;
 		arc & config_file;
 		arc & ewald;

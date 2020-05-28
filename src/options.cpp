@@ -34,6 +34,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("cfl", po::value<double>(&cfl)->default_value(0.03), "CFL factor") //
 	("checkpoint", po::value < std::string > (&checkpoint)->default_value(""), "checkpoint file") //
 	("config_file", po::value < std::string > (&config_file)->default_value(""), "configuration file") //
+	("cuda", po::value<bool>(&cuda)->default_value(false), "enable CUDA") //
 	("ewald", po::value<bool>(&ewald)->default_value(true), "enable periodic BC") //
 	("kernel_size", po::value<double>(&kernel_size)->default_value(-1), "softening length (0.01)") //
 	("fgamma", po::value<double>(&fgamma)->default_value(7.0 / 5.0), "gamma for fluid gamma law") //
@@ -86,6 +87,7 @@ bool options::process_options(int argc, char *argv[]) {
 	hpx::wait_all(futs);
 #define SHOW( opt ) std::cout << std::string( #opt ) << " = " << std::to_string(opt) << '\n';
 	SHOW(cfl);
+	SHOW(cuda);
 	SHOW(fgamma);
 	SHOW(fpe);
 	SHOW(global_time);
@@ -95,5 +97,9 @@ bool options::process_options(int argc, char *argv[]) {
 	SHOW(problem_size);
 	SHOW(theta);
 	SHOW(tmax);
+	if( ewald && cuda ) {
+		printf( "Ewald not enabled for CUDA\n");
+		abort();
+	}
 	return true;
 }

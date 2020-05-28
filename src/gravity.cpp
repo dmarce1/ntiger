@@ -8,9 +8,9 @@ using vect_int =
 general_vect<int, NDIM>;
 real EW(vect);
 
-constexpr int NBIN = 64;
-static std::array<std::array<std::array<real, NBIN + 1>, NBIN + 1>, NBIN + 1> potential;
-static std::array<std::array<std::array<vect, NBIN + 1>, NBIN + 1>, NBIN + 1> force;
+constexpr int EWALD_NBIN = 64;
+static std::array<std::array<std::array<real, EWALD_NBIN + 1>, EWALD_NBIN + 1>, EWALD_NBIN + 1> potential;
+static std::array<std::array<std::array<vect, EWALD_NBIN + 1>, EWALD_NBIN + 1>, EWALD_NBIN + 1> force;
 
 struct ewald {
 	ewald() {
@@ -18,7 +18,7 @@ struct ewald {
 		if (fp) {
 			int cnt = 0;
 			printf("Found ewald.dat\n");
-			const int sz = (NBIN + 1) * (NBIN + 1) * (NBIN + 1);
+			const int sz = (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
 			cnt += fread(&potential, sizeof(real), sz, fp);
 			cnt += fread(&force, sizeof(real), sz * NDIM, fp);
 			int expected = sz * (NDIM + 1);
@@ -31,15 +31,15 @@ struct ewald {
 			printf("ewald.dat not found\n");
 			printf("Initializing Ewald (this may take some time)\n");
 
-			const real dx0 = 0.5 / NBIN;
+			const real dx0 = 0.5 / EWALD_NBIN;
 			for (int dim = 0; dim < NDIM; dim++) {
 				force[0][0][0][dim] = 0.0;
 			}
 			potential[0][0][0] = 2.8372975;
 			real n = 0;
-			for (int i = 0; i <= NBIN; i++) {
+			for (int i = 0; i <= EWALD_NBIN; i++) {
 				for (int j = 0; j <= i; j++) {
-					printf("%% %.2f complete\r", 2.0 * n.get() / double(NBIN + 2) / double(NBIN + 1) * 100.0);
+					printf("%% %.2f complete\r", 2.0 * n.get() / double(EWALD_NBIN + 2) / double(EWALD_NBIN + 1) * 100.0);
 					n += 1.0;
 					fflush (stdout);
 					for (int k = 0; k <= j; k++) {
@@ -93,7 +93,7 @@ struct ewald {
 			}
 			printf("\nDone initializing Ewald\n");
 			fp = fopen("ewald.dat", "wb");
-			const int sz = (NBIN + 1) * (NBIN + 1) * (NBIN + 1);
+			const int sz = (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
 			fwrite(&potential, sizeof(real), sz, fp);
 			fwrite(&force, sizeof(real), sz * NDIM, fp);
 			fclose(fp);
@@ -150,9 +150,9 @@ void ewald_force_and_pot(vect x, vect &f, real &phi, real h) {
 	if (r > 1.0e-4) {
 		general_vect<int, NDIM> I;
 		general_vect<real, NDIM> w;
-		constexpr real dx = 0.5 / NBIN;
+		constexpr real dx = 0.5 / EWALD_NBIN;
 		for (int dim = 0; dim < NDIM; dim++) {
-			I[dim] = std::min(int((x[dim] / dx).get()), NBIN - 1);
+			I[dim] = std::min(int((x[dim] / dx).get()), EWALD_NBIN - 1);
 			w[dim] = 1.0 - (x[dim] / dx - real(I[dim]));
 		}
 		const auto w000 = w[0] * w[1] * w[2];
@@ -319,9 +319,8 @@ std::vector<gravity> gravity_far_cpu(const std::vector<vect> &x, const std::vect
 }
 
 std::vector<gravity> gravity_near(const std::vector<vect> &x, const std::vector<vect> &y) {
-//	const bool cuda = options::get().cuda;
-	const bool cuda = false;
-	if (cuda) {
+	const bool cuda = options::get().cuda;
+	if (cuda && x.size() >= 32) {
 		return gravity_near_cuda(x, y);
 	} else {
 		return gravity_near_cpu(x, y);

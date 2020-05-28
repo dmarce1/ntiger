@@ -66,13 +66,7 @@ inline real bspline(real r) {
 }
 
 inline real W_norm(real h) {
-	if constexpr (NDIM == 1) {
-		return 3.0 * h / 4.0;
-	} else if constexpr (NDIM == 2) {
-		return M_PI * 7 * h * h / 40.0;
-	} else {
-		return M_PI * h * h * h / 8.0;
-	}
+	return M_PI * h * h * h / 8.0;
 }
 
 #endif /* SRC_MATH_HPP_ */

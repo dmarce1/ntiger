@@ -5,7 +5,7 @@
 #include <ntiger/profiler.hpp>
 #include <ntiger/rand.hpp>
 
-#include <hpx/synchronization/mutex.hpp>
+#include <hpx/lcos/local/mutex.hpp>
 
 void tree::apply_boost(vect x) {
 	static const auto opts = options::get();

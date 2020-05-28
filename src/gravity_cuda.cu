@@ -45,21 +45,33 @@ std::vector<gravity> gravity_near_cuda(const std::vector<vect> &x, const std::ve
 		static const bool ewald = options::get().ewald;
 		static const real h = options::get().kernel_size;
 		static const real m = 1.0 / options::get().problem_size;
-		gravity *cg;
-		vect *cx;
-		vect *cy;
-		CUDA_CHECK(cudaMalloc((void** ) &cg, sizeof(gravity) * x.size()));
-		CUDA_CHECK(cudaMalloc((void** ) &cx, sizeof(vect) * x.size()));
-		CUDA_CHECK(cudaMalloc((void** ) &cy, sizeof(vect) * y.size()));
+		static thread_local gravity *cg = nullptr;
+		static thread_local vect *cx = nullptr;
+		static thread_local vect *cy = nullptr;
+		static thread_local int xmax = 0;
+		static thread_local int ymax = 0;
+		if( x.size() > xmax ) {
+			if( xmax > 0 ) {
+				CUDA_CHECK(cudaFree(cg));
+				CUDA_CHECK(cudaFree(cx));
+			}
+			CUDA_CHECK(cudaMalloc((void** ) &cg, sizeof(gravity) * x.size()));
+			CUDA_CHECK(cudaMalloc((void** ) &cx, sizeof(vect) * x.size()));
+			xmax = x.size();
+		}
+		if( y.size() > ymax) {
+			if( ymax > 0 ) {
+				CUDA_CHECK(cudaFree(cy));
+			}
+			CUDA_CHECK(cudaMalloc((void** ) &cy, sizeof(vect) * y.size()));
+			ymax = y.size();
+		}
 		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
 		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(vect), cudaMemcpyHostToDevice));
 		dim3 dimBlock(threads_per_block, 1);
 		dim3 dimGrid((x.size() + threads_per_block - 1) / threads_per_block, 1);
 gravity_near_kernel<<<dimGrid, dimBlock>>>(cg,cx,cy,x.size(),y.size(),h,m,ewald);
 								CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
-		CUDA_CHECK(cudaFree(cg));
-		CUDA_CHECK(cudaFree(cx));
-		CUDA_CHECK(cudaFree(cy));
 	}
 	return g;
 }

@@ -14,7 +14,7 @@
 #include <algorithm>
 #include <cmath>
 
-using real_type = double;
+using real_type = float;
 
 class real {
 	real_type r;

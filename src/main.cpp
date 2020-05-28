@@ -9,12 +9,12 @@ hpx::id_type root;
 void solve_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 	static const auto opts = options::get();
 	if (opts.gravity && !first_kick) {
-//		printf( "Multipoles\n" );
+		printf( "Multipoles\n" );
 		tree::compute_mass_attributes_action()(root);
-//		printf( "Interactions\n" );
+		printf( "Interactions\n" );
 		tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
 	}
-//	printf( "Applying\n" );
+	printf( "Applying\n" );
 	if (opts.problem == "kepler" || opts.problem == "rt" || opts.gravity) {
 		tree::apply_gravity_action()(root, t, dt, first_kick);
 	}

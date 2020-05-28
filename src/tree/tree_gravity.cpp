@@ -190,11 +190,13 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 
 		std::vector<vect> activeX;
 		std::vector<source> sources;
+		activeX.reserve(parts.size());
 		for (int i = 0; i < parts.size(); i++) {
 			if (parts[i].t + parts[i].dt == t + dt) {
 				activeX.push_back(parts[i].x);
 			}
 		}
+		sources.reserve(masses.size());
 		for (int i = 0; i < masses.size(); i++) {
 			source s;
 			s.x = masses[i].com;
@@ -214,8 +216,9 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			}
 		}
 		std::vector<hpx::future<void>> vfuts;
+		vfuts.reserve(gfuts.size());
 		for (auto &n : gfuts) {
-			vfuts.push_back(hpx::async([this, t, dt, h, m,&activeX](hpx::future<std::vector<vect>> fut) {
+			vfuts.push_back(hpx::async([this, t, dt, h, m, &activeX](hpx::future<std::vector<vect>> fut) {
 				const auto pj = fut.get();
 				const auto g = gravity_near(activeX, pj);
 				std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);

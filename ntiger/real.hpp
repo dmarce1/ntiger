@@ -14,7 +14,9 @@
 #include <algorithm>
 #include <cmath>
 
+
 using real_type = float;
+#define REALSIZE 4
 
 class real {
 	real_type r;

@@ -37,7 +37,6 @@ bool options::process_options(int argc, char *argv[]) {
 	("cuda", po::value<bool>(&cuda)->default_value(false), "enable CUDA") //
 	("ewald", po::value<bool>(&ewald)->default_value(true), "enable periodic BC") //
 	("kernel_size", po::value<double>(&kernel_size)->default_value(-1), "softening length (0.01)") //
-	("fgamma", po::value<double>(&fgamma)->default_value(7.0 / 5.0), "gamma for fluid gamma law") //
 	("fpe", po::value<bool>(&fpe)->default_value(true), "enable floating point exceptions") //
 	("global_time", po::value<bool>(&global_time)->default_value(false), "enable global time-stepping") //
 	("gravity", po::value<bool>(&gravity)->default_value(true), "enable gravity") //
@@ -88,7 +87,6 @@ bool options::process_options(int argc, char *argv[]) {
 #define SHOW( opt ) std::cout << std::string( #opt ) << " = " << std::to_string(opt) << '\n';
 	SHOW(cfl);
 	SHOW(cuda);
-	SHOW(fgamma);
 	SHOW(fpe);
 	SHOW(global_time);
 	SHOW(gravity);

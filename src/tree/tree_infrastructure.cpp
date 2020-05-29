@@ -393,7 +393,6 @@ void tree::write_checkpoint(const std::string &filename, fixed_real t) const {
 	static const auto opts = options::get();
 	if (parent == hpx::invalid_id) {
 		fp = fopen(filename.c_str(), "wb");
-		fwrite(&opts.fgamma, sizeof(real), 1, fp);
 		fwrite(&t, sizeof(fixed_real), 1, fp);
 		fclose(fp);
 	}

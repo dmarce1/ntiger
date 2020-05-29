@@ -13,7 +13,6 @@ public:
 	bool gravity;
 	int parts_per_node;
 	int problem_size;
-	double fgamma;
 	double theta;
 	double tmax;
 	double cfl;
@@ -35,7 +34,6 @@ public:
 		arc & kernel_size;
 		arc & parts_per_node;
 		arc & problem_size;
-		arc & fgamma;
 		arc & theta;
 		arc & tmax;
 		arc & problem;

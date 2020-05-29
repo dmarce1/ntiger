@@ -6,11 +6,11 @@
 
 using vect_int =
 general_vect<int, NDIM>;
-real EW(vect);
+real EW(general_vect<double,NDIM>);
 
 constexpr int EWALD_NBIN = 64;
 static std::array<std::array<std::array<real, EWALD_NBIN + 1>, EWALD_NBIN + 1>, EWALD_NBIN + 1> potential;
-static std::array<std::array<std::array<vect, EWALD_NBIN + 1>, EWALD_NBIN + 1>, EWALD_NBIN + 1> force;
+static std::array<std::array<std::array<real, EWALD_NBIN + 1>, EWALD_NBIN + 1>, EWALD_NBIN + 1> force;
 
 struct ewald {
 	ewald() {
@@ -20,8 +20,8 @@ struct ewald {
 			printf("Found ewald.dat\n");
 			const int sz = (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
 			cnt += fread(&potential, sizeof(real), sz, fp);
-			cnt += fread(&force, sizeof(real), sz * NDIM, fp);
-			int expected = sz * (NDIM + 1);
+			cnt += fread(&force, sizeof(real), sz, fp);
+			int expected = sz * 2;
 			if (cnt != expected) {
 				printf("ewald.dat is corrupt, read %i bytes, expected %i. Remove and re-run\n", cnt, expected);
 				abort();
@@ -31,10 +31,8 @@ struct ewald {
 			printf("ewald.dat not found\n");
 			printf("Initializing Ewald (this may take some time)\n");
 
-			const real dx0 = 0.5 / EWALD_NBIN;
-			for (int dim = 0; dim < NDIM; dim++) {
-				force[0][0][0][dim] = 0.0;
-			}
+			const double dx0 = 0.5 / EWALD_NBIN;
+			force[0][0][0] = 0.0;
 			potential[0][0][0] = 2.8372975;
 			real n = 0;
 			for (int i = 0; i <= EWALD_NBIN; i++) {
@@ -43,45 +41,25 @@ struct ewald {
 					n += 1.0;
 					fflush (stdout);
 					for (int k = 0; k <= j; k++) {
-						vect x;
+						general_vect<double,NDIM> x;
 						x[0] = i * dx0;
 						x[1] = j * dx0;
 						x[2] = k * dx0;
 						if (x.dot(x) == 0.0) {
 							continue;
 						}
-						const real dx = 0.001 * dx0;
-						for (int dim = 0; dim < NDIM; dim++) {
-							vect ym = x;
-							vect yp = x;
-							yp[dim] += 0.5 * dx;
-							ym[dim] -= 0.5 * dx;
-							const auto f = -(EW(yp) - EW(ym)) / dx;
-							force[i][j][k][dim] = f;
-						}
-						const auto f = force[i][j][k];
-						force[i][k][j][0] = f[0];
-						force[i][k][j][1] = f[2];
-						force[i][k][j][2] = f[1];
-
-						force[j][i][k][0] = f[1];
-						force[j][i][k][1] = f[0];
-						force[j][i][k][2] = f[2];
-
-						force[j][k][i][0] = f[1];
-						force[j][k][i][1] = f[2];
-						force[j][k][i][2] = f[0];
-
-						force[k][i][j][0] = f[2];
-						force[k][i][j][1] = f[0];
-						force[k][i][j][2] = f[1];
-
-						force[k][j][i][0] = f[2];
-						force[k][j][i][1] = f[1];
-						force[k][j][i][2] = f[0];
-
+						const double dx = 0.25 * dx0;
+						const auto n = x / abs(x);
+						const auto ym = x - n * dx * 0.5;
+						const auto yp = x + n * dx * 0.5;
+						const auto f = -(EW(yp) - EW(ym)) / dx;
 						const auto p = EW(x);
-
+						force[i][j][k] = f;
+						force[i][k][j] = f;
+						force[j][i][k] = f;
+						force[j][k][i] = f;
+						force[k][i][j] = f;
+						force[k][j][i] = f;
 						potential[i][j][k] = p;
 						potential[i][k][j] = p;
 						potential[j][i][k] = p;
@@ -95,7 +73,7 @@ struct ewald {
 			fp = fopen("ewald.dat", "wb");
 			const int sz = (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
 			fwrite(&potential, sizeof(real), sz, fp);
-			fwrite(&force, sizeof(real), sz * NDIM, fp);
+			fwrite(&force, sizeof(real), sz, fp);
 			fclose(fp);
 		}
 
@@ -147,6 +125,7 @@ void ewald_force_and_pot(vect x, vect &f, real &phi, real h) {
 	}
 	phi = 0.0;
 	// Skip ewald
+	real fmag = 0.0;
 	if (r > 1.0e-4) {
 		general_vect<int, NDIM> I;
 		general_vect<real, NDIM> w;
@@ -163,16 +142,15 @@ void ewald_force_and_pot(vect x, vect &f, real &phi, real h) {
 		const auto w101 = (1.0 - w[0]) * w[1] * (1.0 - w[2]);
 		const auto w110 = (1.0 - w[0]) * (1.0 - w[1]) * w[2];
 		const auto w111 = (1.0 - w[0]) * (1.0 - w[1]) * (1.0 - w[2]);
-		for (int dim = 0; dim < NDIM; dim++) {
-			f[dim] += force[I[0]][I[1]][I[2]][dim] * w000;
-			f[dim] += force[I[0]][I[1]][I[2] + 1][dim] * w001;
-			f[dim] += force[I[0]][I[1] + 1][I[2]][dim] * w010;
-			f[dim] += force[I[0]][I[1] + 1][I[2] + 1][dim] * w011;
-			f[dim] += force[I[0] + 1][I[1]][I[2]][dim] * w100;
-			f[dim] += force[I[0] + 1][I[1]][I[2] + 1][dim] * w101;
-			f[dim] += force[I[0] + 1][I[1] + 1][I[2]][dim] * w110;
-			f[dim] += force[I[0] + 1][I[1] + 1][I[2] + 1][dim] * w111;
-		}
+		fmag += force[I[0]][I[1]][I[2]] * w000;
+		fmag += force[I[0]][I[1]][I[2] + 1] * w001;
+		fmag += force[I[0]][I[1] + 1][I[2]] * w010;
+		fmag += force[I[0]][I[1] + 1][I[2] + 1] * w011;
+		fmag += force[I[0] + 1][I[1]][I[2]] * w100;
+		fmag += force[I[0] + 1][I[1]][I[2] + 1] * w101;
+		fmag += force[I[0] + 1][I[1] + 1][I[2]] * w110;
+		fmag += force[I[0] + 1][I[1] + 1][I[2] + 1] * w111;
+		f = x * (fmag / r);
 		phi += potential[I[0]][I[1]][I[2]] * w000;
 		phi += potential[I[0]][I[1]][I[2] + 1] * w001;
 		phi += potential[I[0]][I[1] + 1][I[2]] * w010;
@@ -198,40 +176,40 @@ void ewald_force_and_pot(vect x, vect &f, real &phi, real h) {
 	} else {
 		phi = phi - (1.5 * h * h - 0.5 * r * r) / (h * h * h);
 	}
+	printf("%f %f %f %f\n", fmag.get(), f[0].get(), f[1].get(), f[2].get());
 }
 
-real EW(vect x) {
-	vect h, n;
-
+real EW(general_vect<double,NDIM> x) {
+	general_vect<double,NDIM> n, h;
 	constexpr int nmax = 5;
 	constexpr int hmax = 10;
 
-	real sum1 = 0.0;
+	double sum1 = 0.0;
 	for (int i = -nmax; i <= nmax; i++) {
 		for (int j = -nmax; j <= nmax; j++) {
 			for (int k = -nmax; k <= nmax; k++) {
 				n[0] = i;
 				n[1] = j;
 				n[2] = k;
-				vect xmn = x - n;
-				real absxmn = abs(x - n);
+				const auto xmn = x - n;
+				double absxmn = abs(x - n);
 				if (absxmn < 3.6) {
-					const real xmn2 = absxmn * absxmn;
-					const real xmn3 = xmn2 * absxmn;
+					const double xmn2 = absxmn * absxmn;
+					const double xmn3 = xmn2 * absxmn;
 					sum1 += -(1.0 - erf(2.0 * absxmn)) / absxmn;
 				}
 			}
 		}
 	}
-	real sum2 = 0.0;
+	double sum2 = 0.0;
 	for (int i = -hmax; i <= hmax; i++) {
 		for (int j = -hmax; j <= hmax; j++) {
 			for (int k = -hmax; k <= hmax; k++) {
 				h[0] = i;
 				h[1] = j;
 				h[2] = k;
-				const real absh = abs(h);
-				const real h2 = absh * absh;
+				const double absh = abs(h);
+				const double h2 = absh * absh;
 				if (absh <= 10 && absh > 0) {
 					sum2 += -(1.0 / M_PI) * (1.0 / h2 * exp(-M_PI * M_PI * h2 / 4.0) * cos(2.0 * M_PI * h.dot(x)));
 				}

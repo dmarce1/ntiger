@@ -6,81 +6,81 @@
 
 using vect_int =
 general_vect<int, NDIM>;
-real EW(general_vect<double,NDIM>);
+real EW(general_vect<double, NDIM>);
 
-constexpr int EWALD_NBIN = 64;
-static std::array<std::array<std::array<real, EWALD_NBIN + 1>, EWALD_NBIN + 1>, EWALD_NBIN + 1> potential;
-static std::array<std::array<std::array<real, EWALD_NBIN + 1>, EWALD_NBIN + 1>, EWALD_NBIN + 1> force;
+static ewald_table_t potential;
+static ewald_table_t force;
 
-struct ewald {
-	ewald() {
-		FILE *fp = fopen("ewald.dat", "rb");
-		if (fp) {
-			int cnt = 0;
-			printf("Found ewald.dat\n");
-			const int sz = (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
-			cnt += fread(&potential, sizeof(real), sz, fp);
-			cnt += fread(&force, sizeof(real), sz, fp);
-			int expected = sz * 2;
-			if (cnt != expected) {
-				printf("ewald.dat is corrupt, read %i bytes, expected %i. Remove and re-run\n", cnt, expected);
-				abort();
-			}
-			fclose(fp);
-		} else {
-			printf("ewald.dat not found\n");
-			printf("Initializing Ewald (this may take some time)\n");
+void init_ewald() {
+	FILE *fp = fopen("ewald.dat", "rb");
+	if (fp) {
+		int cnt = 0;
+		printf("Found ewald.dat\n");
+		const int sz = (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
+		cnt += fread(&potential, sizeof(real), sz, fp);
+		cnt += fread(&force, sizeof(real), sz, fp);
+		int expected = sz * 2;
+		if (cnt != expected) {
+			printf("ewald.dat is corrupt, read %i bytes, expected %i. Remove and re-run\n", cnt, expected);
+			abort();
+		}
+		fclose(fp);
+	} else {
+		printf("ewald.dat not found\n");
+		printf("Initializing Ewald (this may take some time)\n");
 
-			const double dx0 = 0.5 / EWALD_NBIN;
-			force[0][0][0] = 0.0;
-			potential[0][0][0] = 2.8372975;
-			real n = 0;
-			for (int i = 0; i <= EWALD_NBIN; i++) {
-				for (int j = 0; j <= i; j++) {
-					printf("%% %.2f complete\r", 2.0 * n.get() / double(EWALD_NBIN + 2) / double(EWALD_NBIN + 1) * 100.0);
-					n += 1.0;
-					fflush (stdout);
-					for (int k = 0; k <= j; k++) {
-						general_vect<double,NDIM> x;
-						x[0] = i * dx0;
-						x[1] = j * dx0;
-						x[2] = k * dx0;
-						if (x.dot(x) == 0.0) {
-							continue;
-						}
-						const double dx = 0.25 * dx0;
-						const auto n = x / abs(x);
-						const auto ym = x - n * dx * 0.5;
-						const auto yp = x + n * dx * 0.5;
-						const auto f = -(EW(yp) - EW(ym)) / dx;
-						const auto p = EW(x);
-						force[i][j][k] = f;
-						force[i][k][j] = f;
-						force[j][i][k] = f;
-						force[j][k][i] = f;
-						force[k][i][j] = f;
-						force[k][j][i] = f;
-						potential[i][j][k] = p;
-						potential[i][k][j] = p;
-						potential[j][i][k] = p;
-						potential[j][k][i] = p;
-						potential[k][i][j] = p;
-						potential[k][j][i] = p;
+		const double dx0 = 0.5 / EWALD_NBIN;
+		force[0][0][0] = 0.0;
+		potential[0][0][0] = 2.8372975;
+		real n = 0;
+		for (int i = 0; i <= EWALD_NBIN; i++) {
+			for (int j = 0; j <= i; j++) {
+				printf("%% %.2f complete\r", 2.0 * n.get() / double(EWALD_NBIN + 2) / double(EWALD_NBIN + 1) * 100.0);
+				n += 1.0;
+				fflush (stdout);
+				for (int k = 0; k <= j; k++) {
+					general_vect<double, NDIM> x;
+					x[0] = i * dx0;
+					x[1] = j * dx0;
+					x[2] = k * dx0;
+					if (x.dot(x) == 0.0) {
+						continue;
 					}
+					const double dx = 0.25 * dx0;
+					const auto n = x / abs(x);
+					const auto ym = x - n * dx * 0.5;
+					const auto yp = x + n * dx * 0.5;
+					const auto f = -(EW(yp) - EW(ym)) / dx;
+					const auto p = EW(x);
+					force[i][j][k] = f;
+					force[i][k][j] = f;
+					force[j][i][k] = f;
+					force[j][k][i] = f;
+					force[k][i][j] = f;
+					force[k][j][i] = f;
+					potential[i][j][k] = p;
+					potential[i][k][j] = p;
+					potential[j][i][k] = p;
+					potential[j][k][i] = p;
+					potential[k][i][j] = p;
+					potential[k][j][i] = p;
 				}
 			}
-			printf("\nDone initializing Ewald\n");
-			fp = fopen("ewald.dat", "wb");
-			const int sz = (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
-			fwrite(&potential, sizeof(real), sz, fp);
-			fwrite(&force, sizeof(real), sz, fp);
-			fclose(fp);
 		}
+		printf("\nDone initializing Ewald\n");
+		fp = fopen("ewald.dat", "wb");
+		const int sz = (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
+		fwrite(&potential, sizeof(real), sz, fp);
+		fwrite(&force, sizeof(real), sz, fp);
+		fclose(fp);
 
 	}
-};
+	if (options::get().cuda) {
+		printf("Loading Ewald table to CUDA\n");
+		set_cuda_ewald_tables(force, potential);
+	}
 
-ewald E;
+}
 
 real ewald_separation(vect x) {
 	real d = 0.0;
@@ -176,11 +176,10 @@ void ewald_force_and_pot(vect x, vect &f, real &phi, real h) {
 	} else {
 		phi = phi - (1.5 * h * h - 0.5 * r * r) / (h * h * h);
 	}
-	printf("%f %f %f %f\n", fmag.get(), f[0].get(), f[1].get(), f[2].get());
 }
 
-real EW(general_vect<double,NDIM> x) {
-	general_vect<double,NDIM> n, h;
+real EW(general_vect<double, NDIM> x) {
+	general_vect<double, NDIM> n, h;
 	constexpr int nmax = 5;
 	constexpr int hmax = 10;
 
@@ -298,7 +297,7 @@ std::vector<gravity> gravity_far_cpu(const std::vector<vect> &x, const std::vect
 
 std::vector<gravity> gravity_near(const std::vector<vect> &x, const std::vector<vect> &y) {
 	const bool cuda = options::get().cuda;
-	if (cuda && x.size() >= 32) {
+	if (cuda && x.size()) {
 		return gravity_near_cuda(x, y);
 	} else {
 		return gravity_near_cpu(x, y);

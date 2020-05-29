@@ -1,8 +1,10 @@
 #include <hpx/hpx_init.hpp>
+#include <ntiger/gravity.hpp>
 #include <ntiger/initialize.hpp>
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
 #include <ntiger/tree.hpp>
+
 
 hpx::id_type root;
 
@@ -78,6 +80,7 @@ int hpx_main(int argc, char *argv[]) {
 	fixed_real t = 0.0;
 	options opts;
 	opts.process_options(argc, argv);
+	init_ewald();
 	std::vector<particle> parts;
 	bool t0;
 	if (opts.checkpoint != "") {

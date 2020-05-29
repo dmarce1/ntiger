@@ -97,9 +97,5 @@ bool options::process_options(int argc, char *argv[]) {
 	SHOW(problem_size);
 	SHOW(theta);
 	SHOW(tmax);
-	if( ewald && cuda ) {
-		printf( "Ewald not enabled for CUDA\n");
-		abort();
-	}
 	return true;
 }

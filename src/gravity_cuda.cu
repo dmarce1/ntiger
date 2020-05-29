@@ -1,9 +1,8 @@
 #include <ntiger/gravity.hpp>
 #include <ntiger/gravity_cuda.hpp>
 #include <ntiger/options.hpp>
-
-real *eforce;
-real *epot;
+#include <cuda_runtime.h>
+#include <cuda.h>
 
 #define CUDA_CHECK( a ) if( a != cudaSuccess ) printf( "CUDA error on line %i of %s : %s\n", __LINE__, __FILE__, cudaGetErrorString(a))
 
@@ -11,15 +10,35 @@ constexpr int DZ = 1;
 constexpr int DY = EWALD_NBIN + 1;
 constexpr int DX = (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
 
+real_type *eforce;
+real_type *epot;
+
+texture<real_type, NDIM> ftex;
+texture<real_type, NDIM> ptex;
+
 void set_cuda_ewald_tables(const ewald_table_t &f, const ewald_table_t &phi) {
 	CUDA_CHECK(cudaMalloc((void** ) &eforce, sizeof(real) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1)));
 	CUDA_CHECK(cudaMalloc((void** ) &epot, sizeof(real) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1)));
 	CUDA_CHECK(cudaMemcpy(eforce, f.data(), sizeof(ewald_table_t), cudaMemcpyHostToDevice));
 	CUDA_CHECK(cudaMemcpy(epot, phi.data(), sizeof(ewald_table_t), cudaMemcpyHostToDevice));
+
+	for (int i = 0; i < 2 * NDIM; i++) {
+		ftex.addressMode[i] = cudaAddressModeClamp;
+		ptex.addressMode[i] = cudaAddressModeClamp;
+
+	}
+	ftex.filterMode = cudaFilterModeLinear;
+	ptex.filterMode = cudaFilterModeLinear;
+	ftex.normalized = false;
+	ptex.normalized = false;
+	size_t offset = 0;
+	constexpr int S3 = (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
+	cudaBindTexture(&offset, ftex, eforce, sizeof(real_type) * S3);
+	cudaBindTexture(&offset, ptex, epot, sizeof(real_type) * S3);
 }
 
 __global__
-void gravity_near_kernel(gravity *g, const vect *x, const vect *y, int xsize, int ysize, real h, real m, bool ewald, const real *ef, const real *ep) {
+void gravity_near_kernel(gravity *g, const vect *x, const vect *y, int xsize, int ysize, real h, real m, bool ewald) {
 	int base = blockIdx.x * blockDim.x;
 	int i = threadIdx.x + base;
 	gravity this_g;
@@ -52,39 +71,13 @@ void gravity_near_kernel(gravity *g, const vect *x, const vect *y, int xsize, in
 				real fmag = 0.0;
 				if (r > 1.0e-3) {
 					const real dxbin = 0.5 / EWALD_NBIN;                                   // 1 OP
-					general_vect<int, NDIM> I;
-					general_vect<real, NDIM> w;
+					general_vect<real_type, NDIM> I;
 					for (int dim = 0; dim < NDIM; dim++) {
-
-						I[dim] = max(min(int((x0[dim] / dxbin).get()), EWALD_NBIN - 1), 0); // 3 * 1 OP
-						w[dim] = 1.0 - (x0[dim] / dxbin - real(I[dim]));                    // 3 * 3 OP
+						I[dim] = (x0[dim] / dxbin).get() + real_type(0.5); 					// 3 * 1 OP
 					}
-					const auto w000 = w[0] * w[1] * w[2];                                   // 2 OP
-					const auto w001 = w[0] * w[1] * (1.0 - w[2]);                           // 3 OP
-					const auto w010 = w[0] * (1.0 - w[1]) * w[2];                           // 3 OP
-					const auto w011 = w[0] * (1.0 - w[1]) * (1.0 - w[2]);                   // 4 OP
-					const auto w100 = (1.0 - w[0]) * w[1] * w[1] * w[2];                    // 4 OP
-					const auto w101 = (1.0 - w[0]) * w[1] * (1.0 - w[2]);                   // 4 OP
-					const auto w110 = (1.0 - w[0]) * (1.0 - w[1]) * w[2];                   // 4 OP
-					const auto w111 = (1.0 - w[0]) * (1.0 - w[1]) * (1.0 - w[2]);           // 5 OP
-					const auto index = I[0] * DX + I[1] * DY + I[2] * DZ;
-					fmag = ef[index] * w000;                                                // 1 OP
-					fmag += ef[index + DZ] * w001;											// 2 OP
-					fmag += ef[index + DY] * w010;											// 2 OP
-					fmag += ef[index + DY + DZ] * w011;										// 2 OP
-					fmag += ef[index + DX] * w100;											// 2 OP
-					fmag += ef[index + DX + DZ] * w101;										// 2 OP
-					fmag += ef[index + DX + DY] * w110;										// 2 OP
-					fmag += ef[index + DX + DY + DZ] * w111;								// 2 OP
+					fmag = tex3D(ftex, I[0], I[1], I[2]);
 					f = x0 * (fmag / r);													// 4 OP
-					phi = ep[index] * w000;                                                 // 1 OP
-					phi += ep[index + DZ] * w001;											// 2 OP
-					phi += ep[index + DY] * w010;											// 2 OP
-					phi += ep[index + DY + DX] * w011;										// 2 OP
-					phi += ep[index + DZ] * w100;											// 2 OP
-					phi += ep[index + DX + DZ] * w101;										// 2 OP
-					phi += ep[index + DX + DY] * w110;										// 2 OP
-					phi += ep[index + DX + DY + DZ] * w111;									// 2 OP
+					phi = tex3D(ptex, I[0], I[1], I[2]);                                                 // 1 OP
 				} else {
 					phi = 2.8372975;
 				}
@@ -159,8 +152,8 @@ std::vector<gravity> gravity_near_cuda(const std::vector<vect> &x, const std::ve
 		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(vect), cudaMemcpyHostToDevice));
 		dim3 dimBlock(threads_per_block, 1);
 		dim3 dimGrid((x.size() + threads_per_block - 1) / threads_per_block, 1);
-gravity_near_kernel<<<dimGrid, dimBlock>>>(cg,cx,cy,x.size(),y.size(),h,m,ewald, eforce, epot);
-										CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
+gravity_near_kernel<<<dimGrid, dimBlock>>>(cg,cx,cy,x.size(),y.size(),h,m,ewald);
+						CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
 	}
 	return g;
 }

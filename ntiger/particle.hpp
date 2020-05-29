@@ -35,6 +35,7 @@ struct particle {
 	}
 };
 
+real sort_by_dimension( std::vector<particle>&, int dim);
 
 
 #endif /* SRC_PARTICLE_HPP_ */

@@ -20,19 +20,18 @@ tree::tree() {
 }
 
 tree::tree(const std::vector<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads,
-		const range &_root_box, const range &_box, bool _leaf) {
+		const range &_box, bool _leaf) {
 	mtx = std::make_shared<hpx::lcos::local::mutex>();
 	parts = _parts;
 	children = _children;
 	child_loads = _child_loads;
-	root_box = _root_box;
 	box = _box;
 	leaf = _leaf;
 	dead = false;
 }
 
-tree::tree(std::vector<particle> &&these_parts, const range &box_, const range &root_box_) :
-		box(box_), dead(false), root_box(root_box_) {
+tree::tree(std::vector<particle> &&these_parts, const range &box_) :
+		box(box_), dead(false) {
 	const int sz = these_parts.size();
 	static const auto opts = options::get();
 	const auto npart_max = opts.parts_per_node;
@@ -50,9 +49,6 @@ tree::tree(std::vector<particle> &&these_parts, const range &box_, const range &
 			box.min[dim] -= dx;
 			box.max[dim] += dx;
 		}
-	}
-	if (root_box == null_range()) {
-		root_box = box;
 	}
 	if (sz > npart_max) {
 		parts = std::move(these_parts);
@@ -84,44 +80,36 @@ int tree::compute_workload() {
 }
 
 void tree::create_children() {
+	real max_span = 0.0;
+	range boxl = box;
+	range boxr = box;
+	const int szl = parts.size() / 2;
+	const int szr = parts.size() - szl;
+	std::vector<particle> pl(szl), pr(szr);
+	int max_dim = 0;
+	for (int dim = 0; dim < NDIM; dim++) {
+		const auto s = box.max[dim] - box.min[dim];
+		if (s > max_span) {
+			max_span = s;
+			max_dim = dim;
+		}
+	}
+	const real mid = sort_by_dimension(parts, max_dim);
+	boxl.max[max_dim] = boxr.min[max_dim] = mid;
+	children[0].box = boxl;
+	children[1].box = boxr;
+	std::move(parts.begin(), parts.begin() + szl, pl.begin());
+	std::move(parts.begin() + szl, parts.end(), pr.begin());
+	 auto fl = hpx::async([boxl, this](std::vector<particle> pl) {
+		return hpx::new_ < tree > (hpx::find_here(), std::move(pl), boxl).get();
+	}, std::move(pl));
+	auto fr = hpx::async([boxr, this](std::vector<particle> pr) {
+		return hpx::new_ < tree > (hpx::find_here(), std::move(pr), boxr).get();
+	}, std::move(pr));
+	parts.resize(0);
 	leaf = false;
-	std::array<hpx::future<hpx::id_type>, NCHILD> futs;
-	range child_box;
-	for (int ci = 0; ci < NCHILD; ci++) {
-		int m = ci;
-		for (int dim = 0; dim < NDIM; dim++) {
-			const auto &b = box.min[dim];
-			const auto &e = box.max[dim];
-			const auto mid = (e + b) * 0.5;
-			if (m & 1) {
-				child_box.min[dim] = mid;
-				child_box.max[dim] = e;
-			} else {
-				child_box.min[dim] = b;
-				child_box.max[dim] = mid;
-			}
-			m >>= 1;
-		}
-		children[ci].box = child_box;
-		int this_sz = parts.size();
-		std::vector<particle> child_parts;
-		for (int i = 0; i < this_sz; i++) {
-			auto &part = parts[i];
-			if (in_range(part.x, child_box)) {
-				child_parts.push_back(std::move(part));
-				this_sz--;
-				parts[i] = parts[this_sz];
-				i--;
-			}
-		}
-		parts.resize(this_sz);
-		futs[ci] = hpx::async([child_box, this](std::vector<particle> child_parts) {
-			return hpx::new_ < tree > (hpx::find_here(), std::move(child_parts), child_box, root_box).get();
-		}, std::move(child_parts));
-	}
-	for (int ci = 0; ci < NCHILD; ci++) {
-		children[ci].id = futs[ci].get();
-	}
+	children[0].id = fl.get();
+	children[1].id = fr.get();
 }
 
 std::vector<particle> tree::destroy() {
@@ -242,7 +230,7 @@ hpx::id_type tree::get_parent() const {
 }
 
 hpx::id_type tree::migrate(const hpx::id_type &loc) {
-	auto id_fut = hpx::new_ < tree > (loc, parts, children, child_loads, root_box, box, leaf);
+	auto id_fut = hpx::new_ < tree > (loc, parts, children, child_loads, box, leaf);
 	auto id = id_fut.get();
 	dead = true;
 	return id;

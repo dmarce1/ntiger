@@ -11,6 +11,6 @@
 #include <cmath>
 
 #define NDIM 3
-static constexpr int NCHILD = 1 << NDIM;
+static constexpr int NCHILD = 2;
 
 #endif /* DIM_HPP_ */

@@ -3,7 +3,7 @@
 #include <ntiger/vect.hpp>
 #include <vector>
 
-constexpr int EWALD_NBIN = 64;
+constexpr int EWALD_NBIN = 128;
 
 using ewald_table_t = std::array<std::array<std::array<real, EWALD_NBIN + 1>, EWALD_NBIN + 1>, EWALD_NBIN + 1>;
 

@@ -32,7 +32,7 @@ void gravity_near_kernel(gravity *g, const vect *x, const vect *y, int xsize, in
 			real phi;
 			const auto dx = x[i] - y[j];
 			if (ewald) {
-				const auto x0 = x[i];
+				auto x0 = dx;
 				vect sgn(1.0);
 				for (int dim = 0; dim < NDIM; dim++) {
 					if (x0[dim] < 0.0) {
@@ -55,7 +55,8 @@ void gravity_near_kernel(gravity *g, const vect *x, const vect *y, int xsize, in
 					general_vect<int, NDIM> I;
 					general_vect<real, NDIM> w;
 					for (int dim = 0; dim < NDIM; dim++) {
-						I[dim] = min(int((x0[dim] / dxbin).get()), EWALD_NBIN - 1);
+
+						I[dim] = max(min(int((x0[dim] / dxbin).get()), EWALD_NBIN - 1),0);
 						w[dim] = 1.0 - (x0[dim] / dxbin - real(I[dim]));
 					}
 					const auto w000 = w[0] * w[1] * w[2];
@@ -68,22 +69,22 @@ void gravity_near_kernel(gravity *g, const vect *x, const vect *y, int xsize, in
 					const auto w111 = (1.0 - w[0]) * (1.0 - w[1]) * (1.0 - w[2]);
 					const auto index = I[0] * DX + I[1] * DY + I[2] * DZ;
 					fmag += ef[index] * w000;
-					fmag += ef[index + DX] * w001;
+					fmag += ef[index + DZ] * w001;
 					fmag += ef[index + DY] * w010;
-					fmag += ef[index + DY + DX] * w011;
-					fmag += ef[index + DZ] * w100;
-					fmag += ef[index + DZ + DX] * w101;
-					fmag += ef[index + DZ + DY] * w110;
-					fmag += ef[index + DZ + DY + DX] * w111;
+					fmag += ef[index + DY + DZ] * w011;
+					fmag += ef[index + DX] * w100;
+					fmag += ef[index + DX + DZ] * w101;
+					fmag += ef[index + DX + DY] * w110;
+					fmag += ef[index + DX + DY + DZ] * w111;
 					f = x0 * (fmag / r);
 					phi += ep[index] * w000;
-					phi += ep[index + DX] * w001;
+					phi += ep[index + DZ] * w001;
 					phi += ep[index + DY] * w010;
 					phi += ep[index + DY + DX] * w011;
 					phi += ep[index + DZ] * w100;
-					phi += ep[index + DZ + DX] * w101;
-					phi += ep[index + DZ + DY] * w110;
-					phi += ep[index + DZ + DY + DX] * w111;
+					phi += ep[index + DX + DZ] * w101;
+					phi += ep[index + DX + DY] * w110;
+					phi += ep[index + DX + DY + DZ] * w111;
 				} else {
 					phi = 2.8372975;
 				}

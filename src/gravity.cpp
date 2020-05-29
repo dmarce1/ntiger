@@ -298,7 +298,8 @@ std::vector<gravity> gravity_far_cpu(const std::vector<vect> &x, const std::vect
 std::vector<gravity> gravity_near(const std::vector<vect> &x, const std::vector<vect> &y) {
 	const bool cuda = options::get().cuda;
 	if (cuda && x.size()) {
-		return gravity_near_cuda(x, y);
+		auto g = gravity_near_cuda(x, y);
+		return g;
 	} else {
 		return gravity_near_cpu(x, y);
 	}

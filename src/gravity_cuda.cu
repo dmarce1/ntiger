@@ -6,22 +6,30 @@
 
 #define CUDA_CHECK( a ) if( a != cudaSuccess ) printf( "CUDA error on line %i of %s : %s\n", __LINE__, __FILE__, cudaGetErrorString(a))
 
-constexpr int DZ = 1;
-constexpr int DY = EWALD_NBIN + 1;
-constexpr int DX = (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
+cudaArray *eforce = 0;
+cudaArray *epot = 0;
 
-real_type *eforce;
-real_type *epot;
-
-texture<real_type, NDIM> ftex;
-texture<real_type, NDIM> ptex;
+texture<real_type, cudaTextureType3D> ftex;
+texture<real_type, cudaTextureType3D> ptex;
 
 void set_cuda_ewald_tables(const ewald_table_t &f, const ewald_table_t &phi) {
-	CUDA_CHECK(cudaMalloc((void** ) &eforce, sizeof(real) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1)));
-	CUDA_CHECK(cudaMalloc((void** ) &epot, sizeof(real) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1)));
-	CUDA_CHECK(cudaMemcpy(eforce, f.data(), sizeof(ewald_table_t), cudaMemcpyHostToDevice));
-	CUDA_CHECK(cudaMemcpy(epot, phi.data(), sizeof(ewald_table_t), cudaMemcpyHostToDevice));
-
+	cudaExtent volume = make_cudaExtent(EWALD_NBIN + 1, EWALD_NBIN + 1, EWALD_NBIN + 1);
+	cudaChannelFormatDesc fchan = cudaCreateChannelDesc<real_type>();
+	cudaChannelFormatDesc pchan = cudaCreateChannelDesc<real_type>();
+	CUDA_CHECK(cudaMalloc3DArray(&eforce, &fchan, volume));
+	CUDA_CHECK(cudaMalloc3DArray(&epot, &pchan, volume));
+	cudaMemcpy3DParms fcopy = { 0 };
+	fcopy.srcPtr = make_cudaPitchedPtr((void*) f.data(), volume.width * sizeof(real_type), volume.width, volume.height);
+	fcopy.dstArray = eforce;
+	fcopy.extent = volume;
+	fcopy.kind = cudaMemcpyHostToDevice;
+	CUDA_CHECK(cudaMemcpy3D(&fcopy));
+	cudaMemcpy3DParms pcopy = { 0 };
+	pcopy.srcPtr = make_cudaPitchedPtr((void*) phi.data(), volume.width * sizeof(real_type), volume.width, volume.height);
+	pcopy.dstArray = epot;
+	pcopy.extent = volume;
+	pcopy.kind = cudaMemcpyHostToDevice;
+	CUDA_CHECK(cudaMemcpy3D(&pcopy));
 	for (int i = 0; i < NDIM; i++) {
 		ftex.addressMode[i] = cudaAddressModeClamp;
 		ptex.addressMode[i] = cudaAddressModeClamp;
@@ -31,10 +39,8 @@ void set_cuda_ewald_tables(const ewald_table_t &f, const ewald_table_t &phi) {
 	ptex.filterMode = cudaFilterModeLinear;
 	ftex.normalized = false;
 	ptex.normalized = false;
-	size_t offset = 0;
-	constexpr int S3 = (EWALD_NBIN + 1) * (EWALD_NBIN + 1) * (EWALD_NBIN + 1);
-	cudaBindTexture(&offset, ftex, eforce, sizeof(real_type) * S3);
-	cudaBindTexture(&offset, ptex, epot, sizeof(real_type) * S3);
+	CUDA_CHECK(cudaBindTextureToArray(ftex, eforce, fchan));
+	CUDA_CHECK(cudaBindTextureToArray(ptex, epot, pchan));
 }
 
 __global__

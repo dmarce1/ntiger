@@ -7,7 +7,7 @@
 
 #define CUDA_CHECK( a ) if( a != cudaSuccess ) printf( "CUDA error on line %i of %s : %s\n", __LINE__, __FILE__, cudaGetErrorString(a))
 
-#define P 512
+#define P 256
 
 cudaArray *eforce = 0;
 cudaArray *epot = 0;
@@ -209,12 +209,16 @@ std::vector<gravity> gravity_near_cuda(const std::vector<vect> &x, const std::ve
 
 if (time) {
 	cudaDeviceSynchronize();
+	static double last_display = 0.0;
 	static double t = 0.0;
 	static double flops = 0.0;
 	stop = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 	t += stop - start;
 	flops += x.size() * y.size() * (ewald ? 102.0 : 20.0);
-	printf("%e FLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / 1024.0 / t);
+	if (t > last_display + 1.0) {
+		printf("%e GFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t);
+		last_display = t;
+	}
 
 }
 

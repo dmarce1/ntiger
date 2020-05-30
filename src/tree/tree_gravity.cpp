@@ -203,6 +203,9 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			s.m = masses[i].mtot;
 			sources.push_back(s);
 		}
+//		if( masses.size() > 0 ) {
+//			printf( "%i\n", (int) masses.size());
+//		}
 		const auto g = gravity_far(activeX, sources);
 		{
 			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
@@ -215,24 +218,24 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				}
 			}
 		}
-		std::vector<hpx::future<void>> vfuts;
-		vfuts.reserve(gfuts.size());
+		std::vector<vect> pj;
+		pj.reserve(gfuts.size() * options::get().parts_per_node);
 		for (auto &n : gfuts) {
-			vfuts.push_back(hpx::async([this, t, dt, h, m, &activeX](hpx::future<std::vector<vect>> fut) {
-				const auto pj = fut.get();
-				const auto g = gravity_near(activeX, pj);
-				std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
-				int j = 0;
-				for (int i = 0; i < parts.size(); i++) {
-					if (parts[i].t + parts[i].dt == t + dt) {
-						parts[i].g = parts[i].g + g[j].g;
-						parts[i].phi += g[j].phi;
-						j++;
-					}
-				}
-			}, std::move(n)));
+			auto tmp = n.get();
+			pj.insert(pj.end(), tmp.begin(), tmp.end());
 		}
-		hpx::wait_all(vfuts);
+		{
+			const auto g = gravity_near(activeX, pj);
+			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
+			int j = 0;
+			for (int i = 0; i < parts.size(); i++) {
+				if (parts[i].t + parts[i].dt == t + dt) {
+					parts[i].g = parts[i].g + g[j].g;
+					parts[i].phi += g[j].phi;
+					j++;
+				}
+			}
+		}
 //		printf( "Waiting for near interactions\n");
 	} else {
 		std::array<hpx::future<void>, NCHILD> cfuts;

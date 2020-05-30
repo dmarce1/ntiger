@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <cmath>
 
-
 using real_type = float;
 #define REALSIZE 4
 
@@ -114,7 +113,17 @@ public:
 	friend CUDA_EXPORT real operator*(real_type a, real b);
 	friend CUDA_EXPORT real operator/(real_type a, real b);
 	friend CUDA_EXPORT real erf(real a);
+	friend CUDA_EXPORT real rsqrt(real a);
 };
+
+CUDA_EXPORT inline real rsqrt(real a) {
+#ifdef __CUDA_ARCH__
+	return rsqrtf(a.r);
+#else
+	return 1.0 / std::sqrt(a.r);
+#endif
+}
+
 //
 CUDA_EXPORT inline real operator+(real_type a, real b) {
 	return real(a + b.r);

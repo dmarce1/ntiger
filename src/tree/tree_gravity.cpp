@@ -192,7 +192,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		std::vector<source> sources;
 		activeX.reserve(parts.size());
 		for (int i = 0; i < parts.size(); i++) {
-			if (parts[i].t + parts[i].dt == t + dt) {
+			if (opts.global_time || parts[i].t + parts[i].dt == t + dt) {
 				activeX.push_back(parts[i].x);
 			}
 		}

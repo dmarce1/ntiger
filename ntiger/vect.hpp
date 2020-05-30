@@ -35,6 +35,10 @@ public:
 	CUDA_EXPORT general_vect operator+(const general_vect &other) const;
 	CUDA_EXPORT general_vect operator*(T r) const;
 	CUDA_EXPORT general_vect operator/(T r) const;
+	CUDA_EXPORT general_vect operator-=(const general_vect &other) ;
+	CUDA_EXPORT general_vect operator+=(const general_vect &other) ;
+	CUDA_EXPORT general_vect operator*=(T r);
+	CUDA_EXPORT general_vect operator/=(T r);
 	CUDA_EXPORT bool operator<(const general_vect &other) const;
 	CUDA_EXPORT bool operator<=(const general_vect &other) const;
 	CUDA_EXPORT bool operator>(const general_vect &other) const;
@@ -83,6 +87,7 @@ CUDA_EXPORT inline general_vect<T, N>::general_vect(std::array<real, N> a) :
 
 template<class T, int N>
 CUDA_EXPORT inline general_vect<T, N>::general_vect(T a) {
+#pragma loop unroll 3
 	for (int i = 0; i < N; i++) {
 		v[i] = a;
 	}
@@ -90,6 +95,7 @@ CUDA_EXPORT inline general_vect<T, N>::general_vect(T a) {
 
 template<class T, int N>
 CUDA_EXPORT inline bool general_vect<T, N>::operator==(const general_vect<T, N> &other) const {
+#pragma loop unroll 3
 	for (int dim = 0; dim < NDIM; dim++) {
 		if ((*this)[dim] != other[dim]) {
 			return false;
@@ -116,6 +122,7 @@ CUDA_EXPORT inline T general_vect<T, N>::operator[](int i) const {
 template<class T, int N>
 CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator-() const {
 	general_vect<T, N> result;
+#pragma loop unroll 3
 	for (int dim = 0; dim < N; dim++) {
 		result[dim] = -v[dim];
 	}
@@ -125,6 +132,7 @@ CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator-() const {
 template<class T, int N>
 CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator-(const general_vect<T, N> &other) const {
 	general_vect<T, N> result;
+#pragma loop unroll 3
 	for (int dim = 0; dim < N; dim++) {
 		result[dim] = v[dim] - other[dim];
 	}
@@ -132,8 +140,45 @@ CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator-(const genera
 }
 
 template<class T, int N>
+CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator-=(const general_vect<T, N> &other) {
+#pragma loop unroll 3
+	for (int dim = 0; dim < N; dim++) {
+		v[dim] -= other[dim];
+	}
+	return *this;
+}
+
+template<class T, int N>
+CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator+=(const general_vect<T, N> &other) {
+#pragma loop unroll 3
+	for (int dim = 0; dim < N; dim++) {
+		v[dim] += other[dim];
+	}
+	return *this;
+}
+
+template<class T, int N>
+CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator*=(T v)  {
+#pragma loop unroll 3
+	for (int dim = 0; dim < N; dim++) {
+		v[dim] *= v;
+	}
+	return *this;
+}
+
+template<class T, int N>
+CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator/=(T v)  {
+#pragma loop unroll 3
+	for (int dim = 0; dim < N; dim++) {
+		v[dim] /= v;
+	}
+	return *this;
+}
+
+template<class T, int N>
 CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator+(const general_vect<T, N> &other) const {
 	general_vect<T, N> result;
+#pragma loop unroll 3
 	for (int dim = 0; dim < N; dim++) {
 		result[dim] = v[dim] + other[dim];
 	}
@@ -143,6 +188,7 @@ CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator+(const genera
 template<class T, int N>
 CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator*(T r) const {
 	general_vect<T, N> result;
+#pragma loop unroll 3
 	for (int dim = 0; dim < N; dim++) {
 		result[dim] = v[dim] * r;
 	}
@@ -152,6 +198,7 @@ CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator*(T r) const {
 template<class T, int N>
 CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator/(T r) const {
 	general_vect<T, N> result;
+#pragma loop unroll 3
 	for (int dim = 0; dim < N; dim++) {
 		result[dim] = v[dim] / r;
 	}
@@ -160,8 +207,9 @@ CUDA_EXPORT inline general_vect<T, N> general_vect<T, N>::operator/(T r) const {
 
 template<class T, int N>
 CUDA_EXPORT inline T general_vect<T, N>::dot(const general_vect<T, N> &other) const {
-	T result = 0.0;
-	for (int dim = 0; dim < N; dim++) {
+	T result = v[0] * other[0];
+#pragma loop unroll 3
+	for (int dim = 1; dim < N; dim++) {
 		result += v[dim] * other[dim];
 	}
 	return result;
@@ -175,6 +223,7 @@ CUDA_EXPORT inline T abs(const general_vect<T, N> &v) {
 template<class T, int N>
 CUDA_EXPORT inline general_vect<T, N> abs(const general_vect<T, N> &a, const general_vect<T, N> &b) {
 	general_vect<T, N> c;
+#pragma loop unroll 3
 	for (int i = 0; i < N; i++) {
 		c[i] = abs(a[i] - b[i]);
 	}
@@ -184,6 +233,7 @@ CUDA_EXPORT inline general_vect<T, N> abs(const general_vect<T, N> &a, const gen
 template<class T, int N>
 CUDA_EXPORT inline general_vect<T, N> max(const general_vect<T, N> &a, const general_vect<T, N> &b) {
 	general_vect<T, N> c;
+#pragma loop unroll 3
 	for (int i = 0; i < N; i++) {
 		c[i] = max(a[i], b[i]);
 	}
@@ -193,6 +243,7 @@ CUDA_EXPORT inline general_vect<T, N> max(const general_vect<T, N> &a, const gen
 template<class T, int N>
 CUDA_EXPORT inline general_vect<T, N> min(const general_vect<T, N> &a, const general_vect<T, N> &b) {
 	general_vect<T, N> c;
+#pragma loop unroll 3
 	for (int i = 0; i < N; i++) {
 		c[i] = min(a[i], b[i]);
 	}

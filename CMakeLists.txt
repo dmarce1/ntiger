@@ -94,8 +94,17 @@ add_hpx_executable(
     ${check2silo_header_files}
 )
 
+add_hpx_executable(
+  cuda_test
+  DEPENDENCIES
+  SOURCES
+    src/cuda_test.cu
+  HEADERS
+)
+
 target_include_directories(ntigerlib PUBLIC ${PROJECT_SOURCE_DIR})
 target_include_directories(ntiger PUBLIC ${PROJECT_SOURCE_DIR})
+target_include_directories(cuda_test PUBLIC ${PROJECT_SOURCE_DIR})
 target_include_directories(check2silo PUBLIC ${PROJECT_SOURCE_DIR})
 
 

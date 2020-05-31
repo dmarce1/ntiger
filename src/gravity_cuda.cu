@@ -98,7 +98,7 @@ void gravity_far_kernel_ewald(gravity *__restrict__ g, const vect *x, const sour
 		const int jmax = min((tile + 1) * P, ysize) - j0;
 		ys[threadIdx.x] = y[min(threadIdx.x + j0, ysize - 1)];
 		__syncthreads();
-//#pragma loop unroll 128
+#pragma loop unroll 128
 		for (int j = 0; j < jmax; j++) {
 			vect f;
 			real phi;
@@ -242,7 +242,7 @@ void gravity_near_kernel_ewald(gravity *__restrict__ g, const vect *x, const vec
 		const int jmax = min((tile + 1) * P, ysize) - j0;
 		ys[threadIdx.x] = y[min(threadIdx.x + j0, ysize - 1)];
 		__syncthreads();
-//#pragma loop unroll 128
+#pragma loop unroll 128
 		for (int j = 0; j < jmax; j++) {
 			vect f;
 			real phi;

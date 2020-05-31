@@ -38,8 +38,8 @@ void set_cuda_ewald_tables(const ewald_table_t &f, const ewald_table_t &phi) {
 		ptex.addressMode[i] = cudaAddressModeClamp;
 
 	}
-	ftex.filterMode = cudaFilterModeLinear;
-	ptex.filterMode = cudaFilterModeLinear;
+	ftex.filterMode = cudaFilterModePoint;
+	ptex.filterMode = cudaFilterModePoint;
 	ftex.normalized = false;
 	ptex.normalized = false;
 	CUDA_CHECK(cudaBindTextureToArray(ftex, eforce, fchan));
@@ -97,7 +97,7 @@ void gravity_near_kernel_ewald(gravity *__restrict__ g, const vect *x, const vec
 	int i0 = threadIdx.x + base;
 	int i = min(i0, xsize - 1);
 	gravity this_g;
-	const real dxbin = 0.5 / EWALD_NBIN;                                   // 1 OP
+	const real dxbininv = (EWALD_NBIN << 1);                                   // 1 OP
 	const real h2 = h * h;
 	const real h2t15 = 1.5 * h * h;
 	const real h3inv = 1.0 / (h * h * h);
@@ -133,15 +133,37 @@ void gravity_near_kernel_ewald(gravity *__restrict__ g, const vect *x, const vec
 			// Skip ewald
 			real fmag = 0.0;
 			const auto rinv = rsqrt(r2 + 1.0e-20);            //1 OP
-			general_vect<real_type, NDIM> I;
+			general_vect<float, NDIM> I;
+			general_vect<real, NDIM> w;
 			for (int dim = 0; dim < NDIM; dim++) {
-				I[dim] = (x0[dim] / dxbin).get() + real_type(0.5); 					// 3 * 1 OP
+				I[dim] = min(int((x0[dim] * dxbininv).get()), EWALD_NBIN - 1);
+				w[dim] = 1.0 - (x0[dim] * dxbininv - I[dim]);
 			}
-			fmag = tex3D(ftex, I[0], I[1], I[2]);									// 33 op
-			fmag = 0.0;
-			phi = 0.0;
-			f = x0 * (fmag * rinv);													// 4 OP
-			phi = tex3D(ptex, I[0], I[1], I[2]);                                    // 33 OP
+			const auto w000 = w[0] * w[1] * w[2];
+			const auto w001 = w[0] * w[1] * (1.0 - w[2]);
+			const auto w010 = w[0] * (1.0 - w[1]) * w[2];
+			const auto w011 = w[0] * (1.0 - w[1]) * (1.0 - w[2]);
+			const auto w100 = (1.0 - w[0]) * w[1] * w[2];
+			const auto w101 = (1.0 - w[0]) * w[1] * (1.0 - w[2]);
+			const auto w110 = (1.0 - w[0]) * (1.0 - w[1]) * w[2];
+			const auto w111 = (1.0 - w[0]) * (1.0 - w[1]) * (1.0 - w[2]);
+			fmag += tex3D(ftex, I[0], I[1], I[2]) * w000;
+			fmag += tex3D(ftex, I[0], I[1], I[2] + 1) * w001;
+			fmag += tex3D(ftex, I[0], I[1] + 1, I[2]) * w010;
+			fmag += tex3D(ftex, I[0], I[1] + 1, I[2] + 1) * w011;
+			fmag += tex3D(ftex, I[0] + 1, I[1], I[2]) * w100;
+			fmag += tex3D(ftex, I[0] + 1, I[1], I[2] + 1) * w101;
+			fmag += tex3D(ftex, I[0] + 1, I[1] + 1, I[2]) * w110;
+			fmag += tex3D(ftex, I[0] + 1, I[1] + 1, I[2] + 1) * w111;
+			f = x0 * (fmag * rinv);
+			phi += tex3D(ptex, I[0], I[1], I[2]) * w000;
+			phi += tex3D(ptex, I[0], I[1], I[2] + 1) * w001;
+			phi += tex3D(ptex, I[0], I[1] + 1, I[2]) * w010;
+			phi += tex3D(ptex, I[0], I[1] + 1, I[2] + 1) * w011;
+			phi += tex3D(ptex, I[0] + 1, I[1], I[2]) * w100;
+			phi += tex3D(ptex, I[0] + 1, I[1], I[2] + 1) * w101;
+			phi += tex3D(ptex, I[0] + 1, I[1] + 1, I[2]) * w110;
+			phi += tex3D(ptex, I[0] + 1, I[1] + 1, I[2] + 1) * w111;
 			const auto r3inv = rinv * rinv * rinv;            //1 OP
 			if (r2 > h2) {
 				phi = phi - rinv;													// 2 OP

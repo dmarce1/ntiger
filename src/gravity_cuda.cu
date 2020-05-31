@@ -214,9 +214,9 @@ if (time) {
 	static double flops = 0.0;
 	stop = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 	t += stop - start;
-	flops += x.size() * y.size() * (ewald ? 102.0 : 20.0);
+	flops += x.size() * y.size() * (ewald ? 115.0 : 20.0);
 	if (t > last_display + 1.0) {
-		printf("%e GFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t);
+		printf("%e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
 		last_display = t;
 	}
 

@@ -221,8 +221,9 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				}
 			}
 		}
-		std::vector<vect> pj;
-		pj.reserve(gfuts.size() * options::get().parts_per_node);
+		hpx::wait_all(gfuts);
+		static thread_local std::vector<vect> pj;
+		pj.clear();
 		for (auto &n : gfuts) {
 			auto tmp = n.get();
 			pj.insert(pj.end(), tmp.begin(), tmp.end());

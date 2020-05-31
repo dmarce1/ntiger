@@ -42,7 +42,7 @@ range shift_range(const range &r_, const vect &v) {
 
 bool in_range(const vect &x, const range &r) {
 	for (int dim = 0; dim < NDIM; dim++) {
-		if (x[dim] < r.min[dim] || x[dim] >= r.max[dim]) {
+		if (x[dim] < r.min[dim] || x[dim] > r.max[dim]) {
 			return false;
 		}
 	}

@@ -29,11 +29,14 @@ void tree::compute_drift(fixed_real dt) {
 		std::vector<particle> parent_parts;
 		{
 			PROFILE();
+			std::lock_guard<hpx::lcos::local::mutex> lock(*mtx);
 			int sz = parts.size();
+
 			bool found;
 			for (int i = 0; i < sz; i++) {
 				auto &pi = parts[i];
 				pi.x = pi.x + pi.v * double(dt);
+//				printf( "%f %f %f\n", pi.x[0].get(), pi.x[1].get(), pi.x[2].get());
 				if (opts.ewald) {
 					pi.x = ewald_location(pi.x);
 				}
@@ -50,9 +53,6 @@ void tree::compute_drift(fixed_real dt) {
 			if (parent_parts.size()) {
 				find_home_action()(parent, std::move(parent_parts));
 			}
-		} else if (parent_parts.size()) {
-			std::lock_guard < hpx::lcos::local::mutex > lock(lost_parts_mtx);
-			lost_parts.insert(lost_parts.end(), parent_parts.begin(), parent_parts.end());
 		}
 	} else {
 		std::array<hpx::future<void>, NCHILD> futs;
@@ -62,21 +62,6 @@ void tree::compute_drift(fixed_real dt) {
 		hpx::wait_all(futs);
 	}
 
-}
-
-real tree::compute_scale_factor() {
-	if (lost_parts.size()) {
-		real max_dim = 0.0;
-		real current_dim = box.max[0];
-		for (int i = 0; i < lost_parts.size(); i++) {
-			for (int dim = 0; dim < NDIM; dim++) {
-				max_dim = std::max(max_dim, abs(lost_parts[i].x[dim]));
-			}
-		}
-		return max_dim / current_dim * 1.1;
-	} else {
-		return 1.0;
-	}
 }
 
 fixed_real tree::compute_timestep(fixed_real t) {

@@ -40,20 +40,6 @@ void drift(fixed_real t, fixed_real dt) {
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
 }
 
-void rescale() {
-	const auto new_scale = tree::compute_scale_factor_action()(root);
-	if (new_scale > 1.0) {
-//		printf("Re-scaling by %13.6e\n", new_scale.get());
-		tree::rescale_action()(root, new_scale, range());
-		tree::compute_drift_action()(root, 0.0);
-		tree::finish_drift_action()(root);
-		tree::send_lost_parts_action()(root, std::vector<particle>());
-		const auto s = tree::tree_statistics_action()(root);
-		tree::redistribute_workload_action()(root, 0, tree::compute_workload_action()(root));
-		tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
-	}
-
-}
 
 void init(fixed_real t, bool t0) {
 	static const auto opts = options::get();
@@ -148,7 +134,6 @@ int hpx_main(int argc, char *argv[]) {
 		printf("gravity\n");
 		solve_gravity(t, dt, false);
 		printf("rescale\n");
-		rescale();
 		t += dt;
 		if (int((last_output / fixed_real(opts.output_freq))) != int(((t / fixed_real(opts.output_freq))))) {
 			last_output = t;

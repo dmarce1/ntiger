@@ -134,49 +134,57 @@ void gravity_near_kernel_ewald(gravity *__restrict__ g, const vect *x, const vec
 			real fmag = 0.0;
 			const auto rinv = rsqrt(r2 + 1.0e-20);            //1 OP
 			general_vect<float, NDIM> I;
+			general_vect<float, NDIM> Ip;
+			general_vect<real, NDIM> wm;
 			general_vect<real, NDIM> w;
 			for (int dim = 0; dim < NDIM; dim++) {
-				I[dim] = min(int((x0[dim] * dxbininv).get()), EWALD_NBIN - 1);
-				w[dim] = 1.0 - (x0[dim] * dxbininv - I[dim]);
+				I[dim] = fminf(int((x0[dim] * dxbininv).get()), EWALD_NBIN - 1); // 3 * 2 OP
+				Ip[dim] = I[dim] + 1.0;                                        // 3 * 1 OP
+				wm[dim] = (x0[dim] * dxbininv - I[dim]);                       // 3 * 2 OP
+				w[dim] = 1.0 - wm[dim];                                        // 3 * 1 OP
 			}
-			const auto w000 = w[0] * w[1] * w[2];
-			const auto w001 = w[0] * w[1] * (1.0 - w[2]);
-			const auto w010 = w[0] * (1.0 - w[1]) * w[2];
-			const auto w011 = w[0] * (1.0 - w[1]) * (1.0 - w[2]);
-			const auto w100 = (1.0 - w[0]) * w[1] * w[2];
-			const auto w101 = (1.0 - w[0]) * w[1] * (1.0 - w[2]);
-			const auto w110 = (1.0 - w[0]) * (1.0 - w[1]) * w[2];
-			const auto w111 = (1.0 - w[0]) * (1.0 - w[1]) * (1.0 - w[2]);
-			fmag += tex3D(ftex, I[0], I[1], I[2]) * w000;
-			fmag += tex3D(ftex, I[0], I[1], I[2] + 1) * w001;
-			fmag += tex3D(ftex, I[0], I[1] + 1, I[2]) * w010;
-			fmag += tex3D(ftex, I[0], I[1] + 1, I[2] + 1) * w011;
-			fmag += tex3D(ftex, I[0] + 1, I[1], I[2]) * w100;
-			fmag += tex3D(ftex, I[0] + 1, I[1], I[2] + 1) * w101;
-			fmag += tex3D(ftex, I[0] + 1, I[1] + 1, I[2]) * w110;
-			fmag += tex3D(ftex, I[0] + 1, I[1] + 1, I[2] + 1) * w111;
-			f = x0 * (fmag * rinv);
-			phi += tex3D(ptex, I[0], I[1], I[2]) * w000;
-			phi += tex3D(ptex, I[0], I[1], I[2] + 1) * w001;
-			phi += tex3D(ptex, I[0], I[1] + 1, I[2]) * w010;
-			phi += tex3D(ptex, I[0], I[1] + 1, I[2] + 1) * w011;
-			phi += tex3D(ptex, I[0] + 1, I[1], I[2]) * w100;
-			phi += tex3D(ptex, I[0] + 1, I[1], I[2] + 1) * w101;
-			phi += tex3D(ptex, I[0] + 1, I[1] + 1, I[2]) * w110;
-			phi += tex3D(ptex, I[0] + 1, I[1] + 1, I[2] + 1) * w111;
-			const auto r3inv = rinv * rinv * rinv;            //1 OP
+			const auto w00 = w[0] * w[1]; // 1 OP
+			const auto w01 = w[0] * w[1]; // 1 OP
+			const auto w10 = w[0] * wm[1]; // 1 OP
+			const auto w11 = w[0] * wm[1]; // 1 OP
+			const auto w000 = w00 * w[2]; // 1 OP
+			const auto w001 = w00 * wm[2]; // 1 OP
+			const auto w010 = w01 * w[2]; // 1 OP
+			const auto w011 = w01 * wm[2]; // 1 OP
+			const auto w100 = w10 * w[2]; // 1 OP
+			const auto w101 = w10 * wm[2]; // 1 OP
+			const auto w110 = w11 * w[2]; // 1 OP
+			const auto w111 = w11 * wm[2]; // 1 OP
+			fmag += tex3D(ftex, I[0], I[1], I[2]) * w000; // 2 OP
+			fmag += tex3D(ftex, I[0], I[1], Ip[2]) * w001; // 2 OP
+			fmag += tex3D(ftex, I[0], Ip[1], I[2]) * w010; // 2 OP
+			fmag += tex3D(ftex, I[0], Ip[1], Ip[2]) * w011; // 2 OP
+			fmag += tex3D(ftex, Ip[0], I[1], I[2]) * w100; // 2 OP
+			fmag += tex3D(ftex, Ip[0], I[1], Ip[2]) * w101; // 2 OP
+			fmag += tex3D(ftex, Ip[0], Ip[1], I[2]) * w110; // 2 OP
+			fmag += tex3D(ftex, Ip[0], Ip[1], Ip[2]) * w111; // 2 OP
+			f = x0 * (fmag * rinv); // 6 OP
+			phi += tex3D(ptex, I[0], I[1], I[2]) * w000; // 2 OP
+			phi += tex3D(ptex, I[0], I[1], Ip[2]) * w001; // 2 OP
+			phi += tex3D(ptex, I[0], Ip[1], I[2]) * w010; // 2 OP
+			phi += tex3D(ptex, I[0], Ip[1], Ip[2]) * w011; // 2 OP
+			phi += tex3D(ptex, Ip[0], I[1], I[2]) * w100; // 2 OP
+			phi += tex3D(ptex, Ip[0], I[1], Ip[2]) * w101; // 2 OP
+			phi += tex3D(ptex, Ip[0], Ip[1], I[2]) * w110; // 2 OP
+			phi += tex3D(ptex, Ip[0], Ip[1], Ip[2]) * w111; // 2 OP
+			const auto r3inv = rinv * rinv * rinv;            //2 OP
 			if (r2 > h2) {
 				phi = phi - rinv;													// 2 OP
 				f = f - x0 * r3inv;														// 6 OP
 			} else {
-				phi = phi - (h2t15 - 0.5 * r2) * h3inv;
-				f = f - x0 * h3inv;
+				phi = phi - (h2t15 - 0.5 * r2) * h3inv;							//4 OP
+				f = f - x0 * h3inv;                                              // 6 OP
 			}
 			for (int dim = 0; dim < NDIM; dim++) {
 				f[dim] *= sgn[dim];														// 3 OP
 			}
-			this_g.g += f;
-			this_g.phi += phi;
+			this_g.g += f;                                         // 3 OP
+			this_g.phi += phi;                                      // 1 OP
 		}
 		__syncthreads();
 	}
@@ -236,7 +244,7 @@ if (time) {
 	static double flops = 0.0;
 	stop = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 	t += stop - start;
-	flops += x.size() * y.size() * (ewald ? 115.0 : 20.0);
+	flops += x.size() * y.size() * (ewald ? 101.0 : 20.0);
 	if (t > last_display + 1.0) {
 		printf("%e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
 		last_display = t;

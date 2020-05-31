@@ -306,8 +306,8 @@ std::vector<gravity> gravity_near(const std::vector<vect> &x, const std::vector<
 }
 
 std::vector<gravity> gravity_far(const std::vector<vect> &x, const std::vector<source> &y) {
-//	const bool cuda = options::get().cuda;
-	const bool cuda = false;
+	const bool cuda = options::get().cuda;
+//	const bool cuda = false;
 	if (cuda) {
 		return gravity_far_cuda(x, y);
 	} else {

@@ -199,18 +199,18 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				activeX.push_back(parts[i].x);
 			}
 		}
-		sources.reserve(masses.size());
-		for (int i = 0; i < masses.size(); i++) {
-			source s;
-			s.x = masses[i].com;
-			s.m = masses[i].mtot;
-			sources.push_back(s);
-		}
+		if (masses.size()) {
+			sources.reserve(masses.size());
+			for (int i = 0; i < masses.size(); i++) {
+				source s;
+				s.x = masses[i].com;
+				s.m = masses[i].mtot;
+				sources.push_back(s);
+			}
 //		if( masses.size() > 0 ) {
 //			printf( "%i\n", (int) masses.size());
 //		}
-		const auto g = gravity_far(activeX, sources);
-		{
+			const auto g = gravity_far(activeX, sources);
 			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 			int j = 0;
 			for (int i = 0; i < parts.size(); i++) {
@@ -221,14 +221,14 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				}
 			}
 		}
-		hpx::wait_all(gfuts);
+		hpx::wait_all (gfuts);
 		for (auto &n : gfuts) {
 			auto pj = n.get();
 			const auto g = gravity_near(activeX, std::move(pj));
 			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 			int j = 0;
 			for (int i = 0; i < parts.size(); i++) {
-				if (parts[i].t + parts[i].dt == t + dt) {
+				if (opts.global_time || (parts[i].t + parts[i].dt == t + dt)) {
 					parts[i].g = parts[i].g + g[j].g;
 					parts[i].phi += g[j].phi;
 					j++;

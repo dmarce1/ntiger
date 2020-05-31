@@ -161,6 +161,9 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				ncfuts.push_back(hpx::async < get_children_action > (nids[i]));
 			}
 		}
+//		if( masses.size()) {
+//			printf( "%i\n", masses.size());
+//		}
 		nids.clear();
 		for (auto &f : ncfuts) {
 			const auto tmp = f.get();

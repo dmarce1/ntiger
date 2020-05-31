@@ -138,7 +138,7 @@ void ewald_force_and_pot(vect x, vect &f, real &phi, real h) {
 		const auto w001 = w[0] * w[1] * (1.0 - w[2]);
 		const auto w010 = w[0] * (1.0 - w[1]) * w[2];
 		const auto w011 = w[0] * (1.0 - w[1]) * (1.0 - w[2]);
-		const auto w100 = (1.0 - w[0]) * w[1] * w[1] * w[2];
+		const auto w100 = (1.0 - w[0]) * w[1] * w[2];
 		const auto w101 = (1.0 - w[0]) * w[1] * (1.0 - w[2]);
 		const auto w110 = (1.0 - w[0]) * (1.0 - w[1]) * w[2];
 		const auto w111 = (1.0 - w[0]) * (1.0 - w[1]) * (1.0 - w[2]);

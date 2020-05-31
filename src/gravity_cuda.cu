@@ -78,7 +78,7 @@ void gravity_near_kernel_newton(gravity *__restrict__ g, const vect *__restrict_
 					this_g.phi -= rinv;                //1 OP
 				} else {
 					this_g.g -= dx * h3inv;
-					this_g.phi -= (h2t15 - 0.5 * r2) * rinv;
+					this_g.phi -= (h2t15 - 0.5 * r2) * h3inv;
 				}
 			}
 			__syncthreads();
@@ -132,17 +132,15 @@ void gravity_near_kernel_ewald(gravity *__restrict__ g, const vect *x, const vec
 				// Skip ewald
 				real fmag = 0.0;
 				const auto rinv = rsqrt(r2 + 1.0e-20);            //1 OP
-				if (r2 > 5.0e-3 * 5.0e-3) {
-					general_vect<real_type, NDIM> I;
-					for (int dim = 0; dim < NDIM; dim++) {
-						I[dim] = (x0[dim] / dxbin).get() + real_type(0.5); 					// 3 * 1 OP
-					}
-					fmag = tex3D(ftex, I[0], I[1], I[2]);									// 33 op
-					f = x0 * (fmag * rinv);													// 4 OP
-					phi = tex3D(ptex, I[0], I[1], I[2]);                                    // 33 OP
-				} else {
-					phi = 2.8372975;
+				general_vect<real_type, NDIM> I;
+				for (int dim = 0; dim < NDIM; dim++) {
+					I[dim] = (x0[dim] / dxbin).get() + real_type(0.5); 					// 3 * 1 OP
 				}
+				fmag = tex3D(ftex, I[0], I[1], I[2]);									// 33 op
+				fmag = 0.0;
+				phi = 0.0;
+				f = x0 * (fmag * rinv);													// 4 OP
+				phi = tex3D(ptex, I[0], I[1], I[2]);                                    // 33 OP
 				const auto r3inv = rinv * rinv * rinv;            //1 OP
 				if (r2 > h2) {
 					phi = phi - rinv;													// 2 OP

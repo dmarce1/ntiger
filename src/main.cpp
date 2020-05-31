@@ -159,6 +159,7 @@ int hpx_main(int argc, char *argv[]) {
 		dt = timestep(t);
 		i++;
 	}
+	printf( "Exiting\n");
 	FILE *fp = fopen("profile.txt", "wt");
 	profiler_output(fp);
 	fclose(fp);

@@ -50,10 +50,12 @@ int main(int argc, char *argv[]) {
 
 		std::vector<real_type> t;
 		std::vector<real_type> dt;
+		std::vector<real_type> phi;
 		std::array<std::vector<real_type>, NDIM> vel;
 		std::array<std::vector<real_type>, NDIM> g;
 		t.reserve(nnodes);
 		dt.reserve(nnodes);
+		phi.reserve(nnodes);
 		for (int dim = 0; dim < NDIM; dim++) {
 			vel[dim].reserve(nnodes);
 			g[dim].reserve(nnodes);
@@ -61,6 +63,7 @@ int main(int argc, char *argv[]) {
 		for (const auto &pi : parts) {
 			t.push_back(double(pi.t));
 			dt.push_back(double(pi.dt));
+			phi.push_back(double(pi.phi.get()));
 			std::array<vect, NDIM> E;
 			for (int dim = 0; dim < NDIM; dim++) {
 				vel[dim].push_back(pi.v[dim].get());
@@ -69,6 +72,7 @@ int main(int argc, char *argv[]) {
 		}
 		DBPutPointvar1(db, "t", "points", t.data(), nnodes, silo_data_type, optlist);
 		DBPutPointvar1(db, "dt", "points", dt.data(), nnodes, silo_data_type, optlist);
+		DBPutPointvar1(db, "phi", "points", phi.data(), nnodes, silo_data_type, optlist);
 		for (int dim = 0; dim < NDIM; dim++) {
 			std::string nm = std::string() + "v_" + char('x' + char(dim));
 			DBPutPointvar1(db, nm.c_str(), "points", vel[dim].data(), nnodes, silo_data_type, optlist);

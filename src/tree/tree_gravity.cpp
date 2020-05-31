@@ -32,7 +32,7 @@ void tree::apply_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 			auto &p = parts[i];
 			if (dt != fixed_real(0.0)) {
 				if (cond(p.t, p.dt, t, dt)) {
-					p.v = p.v + p.g * double(p.dt) * 0.5;
+					p.v = p.v + p.g * real_type(opts.global_time ? dt : p.dt) * 0.5;
 				}
 			}
 		}

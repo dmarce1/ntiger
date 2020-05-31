@@ -16,7 +16,7 @@
 class fixed_real {
 	std::int64_t i;
 	using int128_t = boost::multiprecision::int128_t;
-	static constexpr auto one = double(std::int64_t(1) << std::int64_t(32));
+	static constexpr auto one = real_type(std::int64_t(1) << std::int64_t(32));
 
 public:
 
@@ -121,13 +121,13 @@ public:
 		return *this;
 	}
 
-	inline fixed_real& operator=(double other) {
-		i = std::int64_t(other * double(one));
+	inline fixed_real& operator=(real_type other) {
+		i = std::int64_t(other * real_type(one));
 		return *this;
 	}
 
-	inline fixed_real(double other) {
-		i = std::int64_t(other * double(one));
+	inline fixed_real(real_type other) {
+		i = std::int64_t(other * real_type(one));
 	}
 
 	inline bool operator<(const fixed_real &other) const {
@@ -198,8 +198,8 @@ public:
 		return *this;
 	}
 
-	inline operator double() const {
-		return double(i) / one;
+	inline operator real_type() const {
+		return real_type(i) / one;
 	}
 
 	inline operator int() const {

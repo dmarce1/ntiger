@@ -198,8 +198,8 @@ std::vector<gravity> gravity_near_cuda(const std::vector<vect> &x, const std::ve
 	std::vector<gravity> g(x.size());
 	bool time = true;
 	double start, stop;
-	if (x.size() > 0) {
-		static const bool ewald = options::get().ewald;
+	if (x.size() > 0 && y.size() > 0) {
+		bool ewald = options::get().ewald;
 		static const real h = options::get().kernel_size;
 		static const real m = 1.0 / options::get().problem_size;
 		static thread_local gravity *cg = nullptr;
@@ -230,7 +230,30 @@ std::vector<gravity> gravity_near_cuda(const std::vector<vect> &x, const std::ve
 		if (time) {
 			start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 		}
-
+		if (ewald) {
+			vect xcom = vect(0);
+			vect ycom = vect(0);
+			real xrad = 0.0;
+			real yrad = 0.0;
+			for (int i = 0; i < x.size(); i++) {
+				xcom = xcom + x[i];
+			}
+			for (int i = 0; i < y.size(); i++) {
+				ycom = ycom + y[i];
+			}
+			ycom /= y.size();
+			xcom /= x.size();
+			for (int i = 0; i < x.size(); i++) {
+				xrad = max(abs(x[i] - xcom), xrad);
+			}
+			for (int i = 0; i < y.size(); i++) {
+				yrad = max(abs(y[i] - ycom), yrad);
+			}
+			if (yrad + xrad + abs(xcom - ycom) < EWALD_R0) {
+				printf( "Turning off ewald\n");
+				ewald = false;
+			}
+		}
 		if (ewald) {
 		gravity_near_kernel_ewald<<<dimGrid, dimBlock,P*sizeof(vect)>>>(cg,cx,cy,x.size(),y.size(),h,m);
 	} else {

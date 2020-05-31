@@ -222,25 +222,20 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			}
 		}
 		hpx::wait_all(gfuts);
-		static thread_local std::vector<vect> pj;
-		pj.clear();
 		for (auto &n : gfuts) {
-			auto tmp = n.get();
-			pj.insert(pj.end(), tmp.begin(), tmp.end());
-		}
-		{
-			const auto g = gravity_near(activeX, pj);
+			auto pj = n.get();
+			const auto g = gravity_near(activeX, std::move(pj));
 			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 			int j = 0;
 			for (int i = 0; i < parts.size(); i++) {
-				if (opts.global_time || (parts[i].t + parts[i].dt == t + dt)) {
+				if (parts[i].t + parts[i].dt == t + dt) {
 					parts[i].g = parts[i].g + g[j].g;
 					parts[i].phi += g[j].phi;
 					j++;
 				}
 			}
 		}
-//		printf( "Waiting for near interactions\n");
+		//		printf( "Waiting for near interactions\n");
 	} else {
 		std::array<hpx::future<void>, NCHILD> cfuts;
 		std::vector < hpx::id_type > leaf_nids;

@@ -4,6 +4,7 @@
 #include <vector>
 
 constexpr int EWALD_NBIN = 64;
+#define EWALD_R0 0.08
 
 using ewald_table_t = std::array<std::array<std::array<real, EWALD_NBIN + 1>, EWALD_NBIN + 1>, EWALD_NBIN + 1>;
 

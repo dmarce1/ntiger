@@ -10,12 +10,12 @@ hpx::id_type root;
 void solve_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 	static const auto opts = options::get();
 	if (opts.gravity && !first_kick) {
-		printf("Multipoles\n");
+	//	printf("Multipoles\n");
 		tree::compute_mass_attributes_action()(root);
-		printf("Interactions\n");
+	//	printf("Interactions\n");
 		tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
 	}
-	printf("Applying\n");
+//	printf("Applying\n");
 	if (opts.problem == "kepler" || opts.problem == "rt" || opts.gravity) {
 		tree::apply_gravity_action()(root, t, dt, first_kick);
 	}
@@ -117,7 +117,7 @@ int hpx_main(int argc, char *argv[]) {
 	int i = 0;
 	fixed_real last_output = 0.0;
 	while (t < fixed_real(opts.tmax)) {
-		printf("statistics\n");
+	//	printf("statistics\n");
 		auto s = statistics();
 
 		printf("Step = %i t = %13.6e  dt = %13.6e Nparts = %i Nleaves = %i Max Level = %i  Momentum = ", i, double(t), double(dt), s.nparts, s.nleaves,
@@ -127,20 +127,20 @@ int hpx_main(int argc, char *argv[]) {
 		}
 		printf("ek = %13.6e ep = %13.6e ev = %13.6e verr = %13.6e etot = %13.6e\n", s.ek.get(), s.ep.get(), s.ev.get(),
 				s.ev.get() / (std::abs(s.ep.get()) + 1.0e-100), s.ek.get() + s.ep.get());
-		printf("gravity\n");
+//		printf("gravity\n");
 		solve_gravity(t, dt, true);
-		printf("drift\n");
+//		printf("drift\n");
 		drift(t, dt);
-		printf("gravity\n");
+//		printf("gravity\n");
 		solve_gravity(t, dt, false);
-		printf("rescale\n");
+//		printf("rescale\n");
 		t += dt;
 		if (int((last_output / fixed_real(opts.output_freq))) != int(((t / fixed_real(opts.output_freq))))) {
 			last_output = t;
 			write_checkpoint(++oi, t);
-			printf("output %i\n", oi);
+//			printf("output %i\n", oi);
 		}
-		printf("timestep\n");
+//		printf("timestep\n");
 		dt = timestep(t);
 		i++;
 	}

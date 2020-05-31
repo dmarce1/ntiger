@@ -218,8 +218,7 @@ real EW(general_vect<double, NDIM> x) {
 	return M_PI / 4.0 + sum1 + sum2 + 1 / abs(x);
 }
 
-std::vector<gravity> gravity_near_cpu(const std::vector<vect> &x, const std::vector<vect> &y) {
-	static const bool ewald = options::get().ewald;
+std::vector<gravity> gravity_near_cpu(const std::vector<vect> &x, const std::vector<vect> &y, bool ewald) {
 	static const real h = options::get().kernel_size;
 	static const real h2 = h * h;
 	static const real hinv = 1.0 / h;
@@ -295,13 +294,13 @@ std::vector<gravity> gravity_far_cpu(const std::vector<vect> &x, const std::vect
 	return g;
 }
 
-std::vector<gravity> gravity_near(const std::vector<vect> &x, const std::vector<vect> &y) {
+std::vector<gravity> gravity_near(const std::vector<vect> &x, const std::vector<vect> &y, bool ewald) {
 	const bool cuda = options::get().cuda;
 	if (cuda && x.size()) {
-		auto g = gravity_near_cuda(x, y);
+		auto g = gravity_near_cuda(x, y, ewald);
 		return g;
 	} else {
-		return gravity_near_cpu(x, y);
+		return gravity_near_cpu(x, y, ewald);
 	}
 }
 

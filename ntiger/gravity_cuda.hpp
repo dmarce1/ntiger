@@ -10,7 +10,7 @@
 
 #include <ntiger/vect.hpp>
 
-std::vector<gravity> gravity_near_cuda(const std::vector<vect> &x, const std::vector<vect>&);
+std::vector<gravity> gravity_near_cuda(const std::vector<vect> &x, const std::vector<vect>&, bool ewald);
 std::vector<gravity> gravity_far_cuda(const std::vector<vect> &x, const std::vector<source> &y);
 void set_cuda_ewald_tables(const ewald_table_t &f, const ewald_table_t &phi);
 

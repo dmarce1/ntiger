@@ -51,38 +51,39 @@ void gravity_near_kernel_newton(gravity *__restrict__ g, const vect *__restrict_
 	extern __shared__ int ptr[];
 	vect *ys = (vect*) ptr;
 	int base = blockIdx.x * blockDim.x;
-	int i = threadIdx.x + base;
+	int i0 = threadIdx.x + base;
+	int i = min(i0, xsize - 1);
 	gravity this_g;
 	const real dxbin = 0.5 / EWALD_NBIN;                                   // 1 OP
 	const real h2 = h * h;
 	const real h2t15 = 1.5 * h * h;
 	const real h3inv = 1.0 / (h * h * h);
-	if (i < xsize) {
-		this_g.g = vect(0);
-		this_g.phi = 0.0;
-		for (int tile = 0; tile < (ysize + P - 1) / P; tile++) {
-			const int j0 = tile * P;
-			const int jmax = min((tile + 1) * P, ysize) - j0;
-			ys[threadIdx.x] = y[threadIdx.x + j0];
-			__syncthreads();
+	this_g.g = vect(0);
+	this_g.phi = 0.0;
+	for (int tile = 0; tile < (ysize + P - 1) / P; tile++) {
+		const int j0 = tile * P;
+		const int jmax = min((tile + 1) * P, ysize) - j0;
+		ys[threadIdx.x] = y[threadIdx.x + j0];
+		__syncthreads();
 #pragma loop unroll 128
-			for (int j = 0; j < jmax; j++) {
-				vect f;
-				real phi;
-				const auto dx = x[i] - ys[j]; // 3 OP
-				const auto r2 = dx.dot(dx); // 6 OP
-				const auto rinv = rsqrt(r2 + 1.e-20);            //1 OP
-				if (r2 > h2) {
-					const auto r3inv = rinv * rinv * rinv;            //2 OP
-					this_g.g -= dx * r3inv;            //6 OP
-					this_g.phi -= rinv;                //1 OP
-				} else {
-					this_g.g -= dx * h3inv;
-					this_g.phi -= (h2t15 - 0.5 * r2) * h3inv;
-				}
+		for (int j = 0; j < jmax; j++) {
+			vect f;
+			real phi;
+			const auto dx = x[i] - ys[j]; // 3 OP
+			const auto r2 = dx.dot(dx); // 6 OP
+			const auto rinv = rsqrt(r2 + 1.e-20);            //1 OP
+			if (r2 > h2) {
+				const auto r3inv = rinv * rinv * rinv;            //2 OP
+				this_g.g -= dx * r3inv;            //6 OP
+				this_g.phi -= rinv;                //1 OP
+			} else {
+				this_g.g -= dx * h3inv;
+				this_g.phi -= (h2t15 - 0.5 * r2) * h3inv;
 			}
-			__syncthreads();
 		}
+		__syncthreads();
+	}
+	if (i == i0) {
 		g[i].g = this_g.g * m; // 1 OP
 		g[i].phi = this_g.phi * m; // 1 OP
 	}
@@ -93,70 +94,71 @@ void gravity_near_kernel_ewald(gravity *__restrict__ g, const vect *x, const vec
 	extern __shared__ int ptr[];
 	vect *ys = (vect*) ptr;
 	int base = blockIdx.x * blockDim.x;
-	int i = threadIdx.x + base;
+	int i0 = threadIdx.x + base;
+	int i = min(i0, xsize - 1);
 	gravity this_g;
 	const real dxbin = 0.5 / EWALD_NBIN;                                   // 1 OP
 	const real h2 = h * h;
 	const real h2t15 = 1.5 * h * h;
 	const real h3inv = 1.0 / (h * h * h);
-	if (i < xsize) {
-		this_g.g = vect(0);
-		this_g.phi = 0.0;
-		for (int tile = 0; tile < (ysize + P - 1) / P; tile++) {
-			const int j0 = tile * P;
-			const int jmax = min((tile + 1) * P, ysize) - j0;
-			ys[threadIdx.x] = y[threadIdx.x + j0];
-			__syncthreads();
-#pragma loop unroll 128
-			for (int j = 0; j < jmax; j++) {
-				vect f;
-				real phi;
-				const auto dx = x[i] - ys[j]; // 3 OP
-				auto x0 = dx;
-				vect sgn(1.0);
-				for (int dim = 0; dim < NDIM; dim++) {
-					if (x0[dim] < 0.0) {
-						x0[dim] = -x0[dim];                         // 3 * 1 OP
-						sgn[dim] *= -1.0;                           // 3 * 1 OP
-					}
-					if (x0[dim] > 0.5) {
-						x0[dim] = 1.0 - x0[dim];                   // 3 * 1 OP
-						sgn[dim] *= -1.0;                          // 3 * 1 OP
-					}
+	this_g.g = vect(0);
+	this_g.phi = 0.0;
+	for (int tile = 0; tile < (ysize + P - 1) / P; tile++) {
+		const int j0 = tile * P;
+		const int jmax = min((tile + 1) * P, ysize) - j0;
+		ys[threadIdx.x] = y[min(threadIdx.x + j0, ysize - 1)];
+		__syncthreads();
+//#pragma loop unroll 128
+		for (int j = 0; j < jmax; j++) {
+			vect f;
+			real phi;
+			const auto dx = x[i] - ys[j]; // 3 OP
+			auto x0 = dx;
+			vect sgn(1.0);
+			for (int dim = 0; dim < NDIM; dim++) {
+				if (x0[dim] < 0.0) {
+					x0[dim] = -x0[dim];                         // 3 * 1 OP
+					sgn[dim] *= -1.0;                           // 3 * 1 OP
 				}
-				const real r2 = x0.dot(x0);
-				for (int dim = 0; dim < NDIM; dim++) {
-					f[dim] = 0.0;
+				if (x0[dim] > 0.5) {
+					x0[dim] = 1.0 - x0[dim];                   // 3 * 1 OP
+					sgn[dim] *= -1.0;                          // 3 * 1 OP
 				}
-				phi = 0.0;
-				// Skip ewald
-				real fmag = 0.0;
-				const auto rinv = rsqrt(r2 + 1.0e-20);            //1 OP
-				general_vect<real_type, NDIM> I;
-				for (int dim = 0; dim < NDIM; dim++) {
-					I[dim] = (x0[dim] / dxbin).get() + real_type(0.5); 					// 3 * 1 OP
-				}
-				fmag = tex3D(ftex, I[0], I[1], I[2]);									// 33 op
-				fmag = 0.0;
-				phi = 0.0;
-				f = x0 * (fmag * rinv);													// 4 OP
-				phi = tex3D(ptex, I[0], I[1], I[2]);                                    // 33 OP
-				const auto r3inv = rinv * rinv * rinv;            //1 OP
-				if (r2 > h2) {
-					phi = phi - rinv;													// 2 OP
-					f = f - x0 * r3inv;														// 6 OP
-				} else {
-					phi = phi - (h2t15 - 0.5 * r2) * h3inv;
-					f = f - x0 * h3inv;
-				}
-				for (int dim = 0; dim < NDIM; dim++) {
-					f[dim] *= sgn[dim];														// 3 OP
-				}
-				this_g.g += f;
-				this_g.phi += phi;
 			}
-			__syncthreads();
+			const real r2 = x0.dot(x0);
+			for (int dim = 0; dim < NDIM; dim++) {
+				f[dim] = 0.0;
+			}
+			phi = 0.0;
+			// Skip ewald
+			real fmag = 0.0;
+			const auto rinv = rsqrt(r2 + 1.0e-20);            //1 OP
+			general_vect<real_type, NDIM> I;
+			for (int dim = 0; dim < NDIM; dim++) {
+				I[dim] = (x0[dim] / dxbin).get() + real_type(0.5); 					// 3 * 1 OP
+			}
+			fmag = tex3D(ftex, I[0], I[1], I[2]);									// 33 op
+			fmag = 0.0;
+			phi = 0.0;
+			f = x0 * (fmag * rinv);													// 4 OP
+			phi = tex3D(ptex, I[0], I[1], I[2]);                                    // 33 OP
+			const auto r3inv = rinv * rinv * rinv;            //1 OP
+			if (r2 > h2) {
+				phi = phi - rinv;													// 2 OP
+				f = f - x0 * r3inv;														// 6 OP
+			} else {
+				phi = phi - (h2t15 - 0.5 * r2) * h3inv;
+				f = f - x0 * h3inv;
+			}
+			for (int dim = 0; dim < NDIM; dim++) {
+				f[dim] *= sgn[dim];														// 3 OP
+			}
+			this_g.g += f;
+			this_g.phi += phi;
 		}
+		__syncthreads();
+	}
+	if (i == i0) {
 		g[i].g = this_g.g * m; // 1 OP
 		g[i].phi = this_g.phi * m; // 1 OP
 	}

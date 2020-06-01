@@ -243,7 +243,7 @@ void gravity_near_kernel_ewald(gravity *__restrict__ g, const vect *x, const vec
 			if (r2 > h2) {
 				phi = phi - rinv;													// 2 OP
 				f = f - x0 * r3inv;														// 6 OP
-			} else {
+			} else if( r2 > 0.0){
 				phi = phi - (h2t15 - 0.5 * r2) * h3inv;							//4 OP
 				f = f - x0 * h3inv;                                              // 6 OP
 			}

@@ -3,6 +3,8 @@
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
 #include <ntiger/tree.hpp>
+#include <ntiger/arena.hpp>
+
 
 //constexpr real G = 6.67259e-8;
 constexpr real G = 1;
@@ -222,9 +224,9 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			}
 		}
 		hpx::wait_all (gfuts);
-		std::vector<vect> plist;
-		plist.reserve(gfuts.size() * opts.parts_per_node);
-		std::vector<vect> flist;
+		static arena<vect> allocator;
+		auto& plist = allocator.allocate();
+		auto& flist = allocator.allocate();
 		for (auto &n : gfuts) {
 			auto pj = n.get();
 			plist.insert(plist.end(), pj.begin(), pj.end());
@@ -240,6 +242,21 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				plist.resize(sz);
 			}
 		}
+		if (flist.size()) {
+			const auto g = gravity_near(activeX, std::move(flist), false);
+			{
+				std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
+				int j = 0;
+				for (int i = 0; i < parts.size(); i++) {
+					if (opts.global_time || (parts[i].t + parts[i].dt == t + dt)) {
+						parts[i].g = parts[i].g + g[j].g;
+						parts[i].phi += g[j].phi;
+						j++;
+					}
+				}
+			}
+		}
+		allocator.deallocate(flist);
 		if (plist.size()) {
 			const auto g = gravity_near(activeX, std::move(plist), opts.ewald);
 			{
@@ -254,24 +271,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				}
 			}
 		}
-		if (flist.size()) {
-			const auto g = gravity_near(activeX, std::move(flist), false);
-			{
-				std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
-				int j = 0;
-				for (int i = 0; i < parts.size(); i++) {
-					if (opts.global_time || (parts[i].t + parts[i].dt == t + dt)) {
-						parts[i].g = parts[i].g + g[j].g;
-						parts[i].phi += g[j].phi;
-						j++;
-					}
-				}
-			}
-
-//			const auto pct = (double) flist.size() / (flist.size() + plist.size());
-//			printf( "%i %i %e\n", flist.size(), plist.size(), pct);
-		}
-		//		printf( "Waiting for near interactions\n");
+		allocator.deallocate(plist);
 	} else {
 		std::array<hpx::future<void>, NCHILD> cfuts;
 		std::vector < hpx::id_type > leaf_nids;

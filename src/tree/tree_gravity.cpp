@@ -209,6 +209,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				s.m = masses[i].mtot;
 				sources.push_back(s);
 			}
+			decltype(masses)().swap(masses);
 //		if( masses.size() > 0 ) {
 //			printf( "%i\n", (int) masses.size());
 //		}
@@ -222,6 +223,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 					j++;
 				}
 			}
+			decltype(sources)().swap(sources);
 		}
 		hpx::wait_all (gfuts);
 		static arena<vect> allocator;

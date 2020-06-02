@@ -108,6 +108,7 @@ int hpx_main(int argc, char *argv[]) {
 	} else if (opts.problem == "toomre") {
 		tree::keplerize_action()(root);
 	}
+
 	printf("Time-step\n");
 	fixed_real dt = timestep(t);
 	printf("Start writing\n");

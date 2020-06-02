@@ -262,6 +262,7 @@ void gravity_near_kernel_ewald(gravity *__restrict__ g, const vect *x, const vec
 }
 
 std::vector<gravity> gravity_near_cuda(const std::vector<vect> &x, const std::vector<vect> &y, bool ewald) {
+//	printf( "<+\n" );
 	std::vector<gravity> g(x.size());
 	bool time = true;
 	double start, stop;
@@ -319,10 +320,12 @@ if (time) {
 
 CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
 }
+//	printf( ">+\n" );
 return g;
 }
 
 std::vector<gravity> gravity_far_cuda(const std::vector<vect> &x, const std::vector<source> &y) {
+//	printf( "<-\n" );
 	std::vector<gravity> g(x.size());
 	double start, stop;
 	if (x.size() > 0 && y.size() > 0) {
@@ -378,5 +381,6 @@ std::vector<gravity> gravity_far_cuda(const std::vector<vect> &x, const std::vec
 
 CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
 }
+//	printf( ">-\n" );
 return g;
 }

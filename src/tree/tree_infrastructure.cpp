@@ -37,14 +37,9 @@ tree::tree(std::vector<particle> &&these_parts, const range &box_) :
 
 	/* Create initial box if root */
 	if (box == null_range()) {
-		for (const auto &part : these_parts) {
-			box.min = min(box.min, part.x);
-			box.max = max(box.max, part.x);
-		}
 		for (int dim = 0; dim < NDIM; dim++) {
-			const auto dx = 1.0e-10 * (box.max[dim] - box.min[dim]);
-			box.min[dim] -= dx;
-			box.max[dim] += dx;
+			box.min[dim] = -0.5;
+			box.max[dim] = +0.5;
 		}
 	}
 	if (sz > npart_max) {
@@ -97,6 +92,7 @@ void tree::create_children() {
 	children[1].box = boxr;
 	std::move(parts.begin(), parts.begin() + szl, pl.begin());
 	std::move(parts.begin() + szl, parts.end(), pr.begin());
+	decltype(parts)().swap(parts);
 	auto fl = hpx::async([boxl, this](std::vector<particle> pl) {
 		return hpx::new_ < tree > (hpx::find_here(), std::move(pl), boxl).get();
 	}, std::move(pl));

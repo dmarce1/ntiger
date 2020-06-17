@@ -40,12 +40,12 @@ struct node_attr {
 	}
 };
 
-struct mass_attr {
-	vect com;
-	real mtot;
-	real rmaxs;
-	real rmaxb;
-	bool leaf;
+struct mass_attr {     // 28
+	vect com;           // 12
+	real mtot;          //  4
+	real rmaxs;         // 4
+	real rmaxb;         // 4
+	bool leaf;          // 4
 	template<class Arc>
 	void serialize(Arc &&arc, unsigned) {
 		arc & com;
@@ -56,18 +56,18 @@ struct mass_attr {
 	}
 };
 
-class tree: public hpx::components::component_base<tree> {
-	std::vector<particle> new_parts;
-	std::vector<particle> parts;
-	std::array<node_attr, NCHILD> children;
-	std::array<int, NCHILD> child_loads;
-	hpx::id_type parent;
-	hpx::id_type self;
-	range box;
-	bool leaf;
-	bool dead;
-	mass_attr mass;
-	std::shared_ptr<hpx::lcos::local::mutex> mtx;
+class tree: public hpx::components::component_base<tree>  { // 212
+	std::vector<particle> new_parts;					// 16
+	std::vector<particle> parts;						// 16
+	std::array<node_attr, NCHILD> children;				// 64
+	std::array<int, NCHILD> child_loads;				// 8
+	hpx::id_type parent;                                // 8
+	hpx::id_type self;                                  // 8
+	range box;                                          // 24
+	bool leaf;                                          // 4
+	bool dead;                                          // 4
+	mass_attr mass;                                     // 28
+	std::shared_ptr<hpx::lcos::local::mutex> mtx;       // 32
 public:
 
 	tree();

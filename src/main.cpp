@@ -10,9 +10,9 @@ hpx::id_type root;
 void solve_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 	static const auto opts = options::get();
 	if (opts.gravity && !first_kick) {
-	//	printf("Multipoles\n");
+		//	printf("Multipoles\n");
 		tree::compute_mass_attributes_action()(root);
-	//	printf("Interactions\n");
+		//	printf("Interactions\n");
 		tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
 	}
 //	printf("Applying\n");
@@ -40,7 +40,6 @@ void drift(fixed_real t, fixed_real dt) {
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
 }
 
-
 void init(fixed_real t, bool t0) {
 	static const auto opts = options::get();
 	tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
@@ -66,39 +65,22 @@ int hpx_main(int argc, char *argv[]) {
 	options opts;
 	opts.process_options(argc, argv);
 	init_ewald();
-	std::vector<particle> parts;
-	bool t0;
-	if (opts.checkpoint != "") {
-		printf("Reading %s\n", opts.checkpoint.c_str());
-		FILE *fp = fopen(opts.checkpoint.c_str(), "rb");
-		if (fp == NULL) {
-			printf("Could not find %s\n", opts.checkpoint.c_str());
-			abort();
-		} else {
-			particle p;
-			real dummy;
-			int cnt = fread(&dummy, sizeof(real), 1, fp);
-			cnt += fread(&t, sizeof(real), 1, fp);
-			if (cnt == 0) {
-				printf("Empty checkpoint\n");
-				return hpx::finalize();
-			}
-			while (p.read(fp)) {
-				parts.push_back(p);
-			}
-			fclose(fp);
-		}
-		t0 = false;
-	} else {
-		parts = get_initial_particles(opts.problem, opts.problem_size);
-	}
 	range box;
 	for (int dim = 0; dim < NDIM; dim++) {
 		box.min[dim] = -opts.grid_size / 2.0;
 		box.max[dim] = +opts.grid_size / 2.0;
 	}
-	root = hpx::new_ < tree > (hpx::find_here(), std::move(parts), box).get();
-	init(t, t0);
+	root = hpx::new_ < tree > (hpx::find_here(), std::vector<particle>(), box).get();
+	init(t, 0.0);
+	for (int i = 0; i < 100; i++) {
+		printf("%i\n", i);
+		std::vector<particle> parts;
+		parts = get_initial_particles(opts.problem, opts.problem_size / 100.0);
+		tree::find_home_action()(root, std::move(parts));
+		drift(0.0, 0.0);
+	}
+	while (true) {
+	}
 	printf("Initial load balance\n");
 	drift(t, 0.0);
 	printf("Initial gravity solve\n");
@@ -118,7 +100,7 @@ int hpx_main(int argc, char *argv[]) {
 	int i = 0;
 	fixed_real last_output = 0.0;
 	while (t < fixed_real(opts.tmax)) {
-	//	printf("statistics\n");
+		//	printf("statistics\n");
 		auto s = statistics();
 
 		printf("Step = %i t = %13.6e  dt = %13.6e Nparts = %i Nleaves = %i Max Level = %i  Momentum = ", i, double(t), double(dt), s.nparts, s.nleaves,
@@ -145,7 +127,7 @@ int hpx_main(int argc, char *argv[]) {
 		dt = timestep(t);
 		i++;
 	}
-	printf( "Exiting\n");
+	printf("Exiting\n");
 	FILE *fp = fopen("profile.txt", "wt");
 	profiler_output(fp);
 	fclose(fp);

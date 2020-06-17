@@ -13,12 +13,12 @@
 #include <vector>
 
 struct particle {
-	real phi;
-	vect x;
-	vect v;
-	vect g;
-	fixed_real t;
-	fixed_real dt;
+	real phi;   // 4
+	vect x;     // 12
+	vect v;     // 12
+	vect g;     // 12
+	fixed_real t; // 8
+	fixed_real dt; //8
 	void write(FILE*) const;
 	int read(FILE*);
 	template<class Arc>

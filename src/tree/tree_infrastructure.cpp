@@ -93,14 +93,16 @@ void tree::create_children() {
 	std::move(parts.begin(), parts.begin() + szl, pl.begin());
 	std::move(parts.begin() + szl, parts.end(), pr.begin());
 	decltype(parts)().swap(parts);
+	parts.resize(0);
+
+	leaf = false;
+
 	auto fl = hpx::async([boxl, this](std::vector<particle> pl) {
 		return hpx::new_ < tree > (hpx::find_here(), std::move(pl), boxl).get();
 	}, std::move(pl));
 	auto fr = hpx::async([boxr, this](std::vector<particle> pr) {
 		return hpx::new_ < tree > (hpx::find_here(), std::move(pr), boxr).get();
 	}, std::move(pr));
-	parts.resize(0);
-	leaf = false;
 	children[0].id = fl.get();
 	children[1].id = fr.get();
 }
@@ -167,7 +169,7 @@ tree_attr tree::finish_drift() {
 	const auto npart_max = opts.parts_per_node;
 	if (leaf) {
 		parts.insert(parts.end(), new_parts.begin(), new_parts.end());
-		new_parts.clear();
+		decltype(new_parts)().swap(new_parts);
 		if (parts.size() > npart_max) {
 			create_children();
 		}

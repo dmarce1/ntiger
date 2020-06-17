@@ -190,12 +190,12 @@ real EW(general_vect<double, NDIM> x) {
 				n[0] = i;
 				n[1] = j;
 				n[2] = k;
-				const auto xmn = x - n;
-				double absxmn = abs(x - n);
+				const auto xmn = x - n;                          // 3 OP
+				double absxmn = abs(x - n);                      // 5 OP
 				if (absxmn < 3.6) {
-					const double xmn2 = absxmn * absxmn;
-					const double xmn3 = xmn2 * absxmn;
-					sum1 += -(1.0 - erf(2.0 * absxmn)) / absxmn;
+					const double xmn2 = absxmn * absxmn;         // 1 OP
+					const double xmn3 = xmn2 * absxmn;           // 1 OP
+					sum1 += -(1.0 - erf(2.0 * absxmn)) / absxmn; // 6 OP
 				}
 			}
 		}
@@ -207,10 +207,10 @@ real EW(general_vect<double, NDIM> x) {
 				h[0] = i;
 				h[1] = j;
 				h[2] = k;
-				const double absh = abs(h);
-				const double h2 = absh * absh;
+				const double absh = abs(h);                     // 5 OP
+				const double h2 = absh * absh;                  // 1 OP
 				if (absh <= 10 && absh > 0) {
-					sum2 += -(1.0 / M_PI) * (1.0 / h2 * exp(-M_PI * M_PI * h2 / 4.0) * cos(2.0 * M_PI * h.dot(x)));
+					sum2 += -(1.0 / M_PI) * (1.0 / h2 * exp(-M_PI * M_PI * h2 / 4.0) * cos(2.0 * M_PI * h.dot(x))); // 14 OP
 				}
 			}
 		}

@@ -72,13 +72,20 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	root = hpx::new_ < tree > (hpx::find_here(), std::vector<particle>(), box).get();
 	init(t, 0.0);
+	const auto localities = hpx::find_all_localities();
 	for (int i = 0; i < 100; i++) {
 		printf("%i\n", i);
 		std::vector<particle> parts;
 		parts = get_initial_particles(opts.problem, opts.problem_size / 100.0);
 		tree::find_home_action()(root, std::move(parts));
-		drift(0.0, 0.0);
+		tree::finish_drift_action()(root);
+		if( localities.size() ) {
+			tree::redistribute_workload_action()(root, 0, tree::compute_workload_action()(root));
+		}
+		tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
 	}
+
+//	abort();
 	while (true) {
 	}
 	printf("Initial load balance\n");

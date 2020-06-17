@@ -77,7 +77,7 @@ void tree::create_children() {
 	range boxr = box;
 	const int szl = parts.size() / 2;
 	const int szr = parts.size() - szl;
-	std::vector<particle> pl(szl), pr(szr);
+	std::vector<particle> pl, pr;
 	int max_dim = 0;
 	for (int dim = 0; dim < NDIM; dim++) {
 		const auto s = box.max[dim] - box.min[dim];
@@ -86,23 +86,24 @@ void tree::create_children() {
 			max_dim = dim;
 		}
 	}
-	const real mid = sort_by_dimension(parts, max_dim);
+	const real mid = 0.5 * (box.min[max_dim] + box.max[max_dim]);
 	boxl.max[max_dim] = boxr.min[max_dim] = mid;
 	children[0].box = boxl;
 	children[1].box = boxr;
-	std::move(parts.begin(), parts.begin() + szl, pl.begin());
-	std::move(parts.begin() + szl, parts.end(), pr.begin());
+	for (const auto &p : parts) {
+//		printf( "%f %f %f \n", (double) p.x[0].get(),  (double) p.x[1].get(),  (double) p.x[2].get());
+		if (p.x[max_dim] < mid) {
+			pl.push_back(p);
+		} else {
+			pr.push_back(p);
+		}
+	}
 	decltype(parts)().swap(parts);
-	parts.resize(0);
 
 	leaf = false;
-
-	auto fl = hpx::async([boxl, this](std::vector<particle> pl) {
-		return hpx::new_ < tree > (hpx::find_here(), std::move(pl), boxl).get();
-	}, std::move(pl));
-	auto fr = hpx::async([boxr, this](std::vector<particle> pr) {
-		return hpx::new_ < tree > (hpx::find_here(), std::move(pr), boxr).get();
-	}, std::move(pr));
+//	printf( "%li %li\n", pr.size(), pl.size());
+	auto fl = hpx::new_ < tree > (hpx::find_here(), std::move(pl), boxl);
+	auto fr = hpx::new_ < tree > (hpx::find_here(), std::move(pr), boxr);
 	children[0].id = fl.get();
 	children[1].id = fr.get();
 }
@@ -158,8 +159,8 @@ void tree::find_home(const std::vector<particle> &pis) {
 		}
 	} else if (parent_parts.size()) {
 		const auto &p = parent_parts[0];
-		printf("Lost a particle %f %f %f |%f %f %f %f %f %f |\n", p.x[0].get(), p.x[1].get(), p.x[2].get(),
-				box.min[0].get(), box.max[0].get(),box.min[1].get(), box.max[1].get(),box.min[2].get(), box.max[2].get());
+		printf("Lost a particle %f %f %f |%f %f %f %f %f %f |\n", p.x[0].get(), p.x[1].get(), p.x[2].get(), box.min[0].get(), box.max[0].get(),
+				box.min[1].get(), box.max[1].get(), box.min[2].get(), box.max[2].get());
 	}
 	self_fut.get();
 }
@@ -172,6 +173,13 @@ tree_attr tree::finish_drift() {
 		decltype(new_parts)().swap(new_parts);
 		if (parts.size() > npart_max) {
 			create_children();
+		} else if (parts.size() != parts.capacity()) {
+			decltype(parts) tmp;
+			tmp.reserve(parts.capacity());
+			for (auto p : parts) {
+				tmp.push_back(p);
+			}
+			parts = std::move(tmp);
 		}
 	} else {
 		std::array<hpx::future<tree_attr>, NCHILD> futs;

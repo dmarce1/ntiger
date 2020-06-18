@@ -7,9 +7,11 @@
 //constexpr real G = 6.67259e-8;
 constexpr real G = 1;
 
-void tree::apply_gravity(fixed_real t, fixed_real dt, bool first_kick) {
-	//PROFILE();
+fixed_real tree::apply_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 	const static auto opts = options::get();
+	const auto h = opts.kernel_size;
+	fixed_real tmin = fixed_real::max();
+	//PROFILE();
 	const auto first_condition = [](fixed_real t0, fixed_real dt0, fixed_real t1, fixed_real dt1) {
 		return t0 == t1;
 	};
@@ -29,19 +31,35 @@ void tree::apply_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 	}
 	if (leaf) {
 		for (auto &p : parts) {
-			if (dt != fixed_real(0.0)) {
-				if (cond(p.t, p.dt, t, dt)) {
-					p.v = p.v + p.g * real_type(opts.global_time ? dt : p.dt) * 0.5;
+			if (cond(p.t, p.dt, t, dt)) {
+				p.v = p.v + p.g * real_type(opts.global_time ? dt : p.dt) * 0.5;
+				if (!first_kick) {
+					p.t += opts.global_time ? dt : p.dt;
+					p.dt = fixed_real::max();
+					const auto a = abs(p.g);
+					if (a > 0.0) {
+						const real this_dt = sqrt(h / a);
+						if (this_dt < (double) fixed_real::max()) {
+							p.dt = double(min(p.dt, fixed_real(this_dt.get())));
+						}
+					}
+					p.dt *= opts.cfl;
+					p.dt = p.dt.nearest_log2();
+					p.dt = min(p.dt, (t + dt).next_bin() - (t + dt));
+					tmin = min(tmin, p.dt);
 				}
 			}
 		}
 	} else {
-		std::array<hpx::future<void>, NCHILD> futs;
+		std::array<hpx::future<fixed_real>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
 			futs[ci] = hpx::async < apply_gravity_action > (children[ci].id, t, dt, first_kick);
 		}
-		hpx::wait_all(futs);
+		for (int ci = 0; ci < NCHILD; ci++) {
+			tmin = min(tmin, futs[ci].get());
+		}
 	}
+	return tmin;
 }
 
 mass_attr tree::compute_mass_attributes() {

@@ -7,7 +7,7 @@
 
 hpx::id_type root;
 
-void solve_gravity(fixed_real t, fixed_real dt, bool first_kick) {
+fixed_real solve_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 	static const auto opts = options::get();
 	if (opts.gravity && !first_kick) {
 		//	printf("Multipoles\n");
@@ -16,9 +16,7 @@ void solve_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 		tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
 	}
 //	printf("Applying\n");
-	if (opts.problem == "kepler" || opts.problem == "rt" || opts.gravity) {
-		tree::apply_gravity_action()(root, t, dt, first_kick);
-	}
+	return tree::apply_gravity_action()(root, t, dt, first_kick);
 }
 
 void drift(fixed_real t, fixed_real dt) {
@@ -50,12 +48,6 @@ void write_checkpoint(int i, fixed_real t) {
 	tree::write_silo_action()(root, i + 1, t);
 }
 
-fixed_real timestep(fixed_real t) {
-	static const auto opts = options::get();
-	fixed_real dt = tree::compute_timestep_action()(root, t);
-	return dt;
-}
-
 auto statistics() {
 	return tree::tree_statistics_action()(root);
 }
@@ -78,27 +70,25 @@ int hpx_main(int argc, char *argv[]) {
 		auto parts = get_initial_particles(opts.problem, opts.problem_size / 100.0);
 		tree::find_home_action()(root, std::move(parts));
 		tree::finish_drift_action()(root);
-		if( localities.size() ) {
+		if (localities.size()) {
 			tree::redistribute_workload_action()(root, 0, tree::compute_workload_action()(root));
 		}
 		tree::set_self_and_parent_action()(root, root, hpx::invalid_id);
 	}
 
 //	abort();
-	while (true) {
-	}
+//	while (true) {
+//	}
 	printf("Initial load balance\n");
 	drift(t, 0.0);
 	printf("Initial gravity solve\n");
-	solve_gravity(t, 0.0, false);
+	fixed_real dt = solve_gravity(t, 0.0, false);
 	if (opts.problem == "plummer") {
 		tree::virialize_action()(root);
 	} else if (opts.problem == "toomre") {
 		tree::keplerize_action()(root);
 	}
 
-	printf("Time-step\n");
-	fixed_real dt = timestep(t);
 	printf("Start writing\n");
 	write_checkpoint(0, t);
 	printf("Done writing\n");
@@ -121,7 +111,7 @@ int hpx_main(int argc, char *argv[]) {
 //		printf("drift\n");
 		drift(t, dt);
 //		printf("gravity\n");
-		solve_gravity(t, dt, false);
+		const auto new_dt = solve_gravity(t, dt, false);
 //		printf("rescale\n");
 		t += dt;
 		if (int((last_output / fixed_real(opts.output_freq))) != int(((t / fixed_real(opts.output_freq))))) {
@@ -130,7 +120,8 @@ int hpx_main(int argc, char *argv[]) {
 //			printf("output %i\n", oi);
 		}
 //		printf("timestep\n");
-		dt = timestep(t);
+//		dt = timestep(t);
+		dt = new_dt;
 		i++;
 	}
 	printf("Exiting\n");

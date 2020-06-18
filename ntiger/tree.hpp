@@ -76,11 +76,10 @@ public:
 	tree(list<particle>&&, const range&);
 
 	void apply_boost(vect);
-	void apply_gravity(fixed_real, fixed_real, bool);
+	fixed_real apply_gravity(fixed_real, fixed_real, bool);
 	mass_attr compute_mass_attributes();
 	void compute_drift(fixed_real);
 	void compute_gravity(std::vector<hpx::id_type>, std::vector<mass_attr>, fixed_real, fixed_real, bool self_call);
-	fixed_real compute_timestep(fixed_real);
 	void compute_interactions();
 	int compute_workload();
 	void create_children();
@@ -120,7 +119,6 @@ public:
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,apply_gravity);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_mass_attributes);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_drift);
-	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_timestep);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_interactions);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_workload);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,destroy);

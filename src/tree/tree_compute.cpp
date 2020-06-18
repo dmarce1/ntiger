@@ -62,43 +62,6 @@ void tree::compute_drift(fixed_real dt) {
 
 }
 
-fixed_real tree::compute_timestep(fixed_real t) {
-	const static auto opts = options::get();
-	const auto h = opts.kernel_size;
-	fixed_real tmin = fixed_real::max();
-	if (leaf) {
-		PROFILE();
-		for (auto &pi : parts) {
-			if (pi.t + pi.dt == t || opts.global_time) {
-				pi.t += pi.dt;
-			}
-			if (pi.t == t || opts.global_time) {
-				pi.dt = fixed_real::max();
-				const auto a = abs(pi.g);
-				if (a > 0.0) {
-					const real this_dt = sqrt(h / a);
-					if (this_dt < (double) fixed_real::max()) {
-						pi.dt = double(min(pi.dt, fixed_real(this_dt.get())));
-					}
-				}
-				pi.dt *= opts.cfl;
-				pi.dt = pi.dt.nearest_log2();
-				pi.dt = min(pi.dt, t.next_bin() - t);
-				tmin = min(tmin, pi.dt);
-			}
-		}
-	} else {
-		std::array<hpx::future<fixed_real>, NCHILD> futs;
-		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < compute_timestep_action > (children[ci].id, t);
-		}
-		for (int ci = 0; ci < NCHILD; ci++) {
-			tmin = min(tmin, futs[ci].get());
-		}
-	}
-	return tmin;
-}
-
 void tree::virialize() {
 	if (leaf) {
 		for (auto &p : parts) {

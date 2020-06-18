@@ -10,8 +10,7 @@
 void tree::apply_boost(vect x) {
 	static const auto opts = options::get();
 	if (leaf) {
-		for (int i = 0; i < parts.size(); i++) {
-			auto &pi = parts[i];
+		for (auto &pi : parts) {
 			pi.v = pi.v + x;
 		}
 	} else {
@@ -26,26 +25,25 @@ void tree::apply_boost(vect x) {
 void tree::compute_drift(fixed_real dt) {
 	static const auto opts = options::get();
 	if (leaf) {
-		std::vector<particle> parent_parts;
+		list<particle> parent_parts;
 		{
 			PROFILE();
-			std::lock_guard<hpx::lcos::local::mutex> lock(*mtx);
+			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 			int sz = parts.size();
 
 			bool found;
-			for (int i = 0; i < sz; i++) {
-				auto &pi = parts[i];
+			for (auto i = parts.begin(); i != parts.end();) {
+				auto &pi = *i;
 				pi.x = pi.x + pi.v * double(dt);
 //				printf( "%f %f %f\n", pi.x[0].get(), pi.x[1].get(), pi.x[2].get());
 				if (opts.ewald) {
 					pi.x = ewald_location(pi.x);
 				}
+				i++;
 				if (!in_range(pi.x, box)) {
-					parent_parts.push_back(pi);
-					sz--;
-					parts[i] = parts[sz];
-					i--;
-					parts.resize(sz);
+					parent_parts.push_front(pi);
+					std::swap(parts.front(), pi);
+					parts.pop_front();
 				}
 			}
 		}
@@ -70,8 +68,7 @@ fixed_real tree::compute_timestep(fixed_real t) {
 	fixed_real tmin = fixed_real::max();
 	if (leaf) {
 		PROFILE();
-		for (int i = 0; i < parts.size(); i++) {
-			auto &pi = parts[i];
+		for (auto &pi : parts) {
 			if (pi.t + pi.dt == t || opts.global_time) {
 				pi.t += pi.dt;
 			}

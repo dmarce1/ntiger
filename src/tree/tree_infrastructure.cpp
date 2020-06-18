@@ -16,7 +16,7 @@ tree::tree() {
 	leaf = false;
 }
 
-tree::tree(const std::vector<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads, const range &_box,
+tree::tree(const list<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads, const range &_box,
 		bool _leaf) {
 	mtx = std::make_shared<hpx::lcos::local::mutex>();
 	parts = _parts;
@@ -27,7 +27,7 @@ tree::tree(const std::vector<particle> &_parts, const std::array<node_attr, NCHI
 	dead = false;
 }
 
-tree::tree(std::vector<particle> &&these_parts, const range &box_) :
+tree::tree(list<particle> &&these_parts, const range &box_) :
 		box(box_), dead(false) {
 	const int sz = these_parts.size();
 	static const auto opts = options::get();
@@ -77,7 +77,7 @@ void tree::create_children() {
 	range boxr = box;
 	const int szl = parts.size() / 2;
 	const int szr = parts.size() - szl;
-	std::vector<particle> pl, pr;
+	list<particle> pl, pr;
 	int max_dim = 0;
 	for (int dim = 0; dim < NDIM; dim++) {
 		const auto s = box.max[dim] - box.min[dim];
@@ -91,14 +91,13 @@ void tree::create_children() {
 	children[0].box = boxl;
 	children[1].box = boxr;
 	for (const auto &p : parts) {
-//		printf( "%f %f %f \n", (double) p.x[0].get(),  (double) p.x[1].get(),  (double) p.x[2].get());
 		if (p.x[max_dim] < mid) {
-			pl.push_back(p);
+			pl.push_front(p);
 		} else {
-			pr.push_back(p);
+			pr.push_front(p);
 		}
 	}
-	decltype(parts)().swap(parts);
+	parts = decltype(parts)();
 
 	leaf = false;
 //	printf( "%li %li\n", pr.size(), pl.size());
@@ -108,24 +107,23 @@ void tree::create_children() {
 	children[1].id = fr.get();
 }
 
-std::vector<particle> tree::destroy() {
+list<particle> tree::destroy() {
 	self = hpx::invalid_id;
 	dead = true;
 	return parts;
 }
 
-void tree::find_home(const std::vector<particle> &pis) {
-	std::vector<particle> self_parts;
-	std::vector<particle> parent_parts;
+void tree::find_home(const list<particle> &homeless) {
+	list<particle> self_parts;
+	list<particle> parent_parts;
 
 	{
 		PROFILE();
-		for (int i = 0; i < pis.size(); i++) {
-			const auto &pi = pis[i];
+		for( auto& pi : homeless) {
 			if (in_range(pi.x, box)) {
-				self_parts.push_back(pi);
+				self_parts.push_front(pi);
 			} else {
-				parent_parts.push_back(pi);
+				parent_parts.push_front(pi);
 			}
 
 		}
@@ -137,13 +135,16 @@ void tree::find_home(const std::vector<particle> &pis) {
 		} else {
 			std::array<hpx::future<void>, NCHILD> cfuts;
 			for (int ci = 0; ci < NCHILD; ci++) {
-				std::vector<particle> cparts;
-				for (int i = 0; i < self_parts.size(); i++) {
-					if (in_range(self_parts[i].x, children[ci].box)) {
-						cparts.push_back(self_parts[i]);
-						self_parts[i] = self_parts[self_parts.size() - 1];
-						self_parts.resize(self_parts.size() - 1);
-						i--;
+				list<particle> cparts;
+				for (auto i = self_parts.begin(); i != self_parts.end();) {
+					auto& p = *i;
+					if (in_range(p.x, children[ci].box)) {
+						cparts.push_front(p);
+						std::swap(p,self_parts.front());
+						i++;
+						self_parts.pop_front();
+					} else {
+						i++;
 					}
 				}
 				cfuts[ci] = hpx::async < find_home_action > (children[ci].id, std::move(cparts));
@@ -158,7 +159,7 @@ void tree::find_home(const std::vector<particle> &pis) {
 			find_home_action()(parent, std::move(parent_parts));
 		}
 	} else if (parent_parts.size()) {
-		const auto &p = parent_parts[0];
+		const auto &p = parent_parts.front();
 		printf("Lost a particle %f %f %f |%f %f %f %f %f %f |\n", p.x[0].get(), p.x[1].get(), p.x[2].get(), box.min[0].get(), box.max[0].get(),
 				box.min[1].get(), box.max[1].get(), box.min[2].get(), box.max[2].get());
 	}
@@ -171,13 +172,6 @@ tree_attr tree::finish_drift() {
 	if (leaf) {
 		if (parts.size() > npart_max) {
 			create_children();
-		} else if (parts.size() != parts.capacity()) {
-			decltype(parts) tmp;
-			tmp.reserve(parts.capacity());
-			for (auto p : parts) {
-				tmp.push_back(p);
-			}
-			parts = std::move(tmp);
 		}
 	} else {
 		std::array<hpx::future<tree_attr>, NCHILD> futs;
@@ -195,14 +189,16 @@ tree_attr tree::finish_drift() {
 			}
 		}
 		if (cparts <= npart_max && all_leaves) {
-			std::array < hpx::future<std::vector<particle>>, NCHILD > dfuts;
+			std::array < hpx::future<list<particle>>, NCHILD > dfuts;
 			for (int ci = 0; ci < NCHILD; ci++) {
 				dfuts[ci] = hpx::async < destroy_action > (children[ci].id);
 			}
 			for (int ci = 0; ci < NCHILD; ci++) {
 				const auto tmp = dfuts[ci].get();
 				children[ci].id = hpx::invalid_id;
-				parts.insert(parts.end(), tmp.begin(), tmp.end());
+				for( auto& p : tmp) {
+					parts.push_front(p);
+				}
 			}
 			leaf = true;
 		}
@@ -288,11 +284,11 @@ void tree::redistribute_workload(int current, int total) {
 	}
 }
 
-void tree::send_particles(const std::vector<particle> &pj) {
+void tree::send_particles(const list<particle> &pj) {
 	std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 	PROFILE();
 	for (auto p : pj) {
-		parts.push_back(std::move(p));
+		parts.push_front(std::move(p));
 	}
 }
 
@@ -323,7 +319,7 @@ tree_stats tree::tree_statistics() const {
 	if (leaf) {
 		stats.nparts = parts.size();
 		stats.nleaves = 1;
-		for (const auto &p : parts) {
+		for (auto p : parts) {
 			const real ek = 0.5 * p.v.dot(p.v) * m;
 			const real ep = 0.5 * p.phi * m;
 			const real ev = 2.0 * ek + ep;
@@ -364,7 +360,7 @@ void tree::write_checkpoint(const std::string &filename, fixed_real t) const {
 	}
 	if (leaf) {
 		fp = fopen(filename.c_str(), "ab");
-		for (const auto &part : parts) {
+		for (auto part : parts) {
 			part.write(fp);
 		}
 		fclose(fp);

@@ -3,8 +3,6 @@
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
 #include <ntiger/tree.hpp>
-#include <ntiger/arena.hpp>
-
 
 //constexpr real G = 6.67259e-8;
 constexpr real G = 1;
@@ -30,8 +28,7 @@ void tree::apply_gravity(fixed_real t, fixed_real dt, bool first_kick) {
 		cond = second_condition;
 	}
 	if (leaf) {
-		for (int i = 0; i < parts.size(); i++) {
-			auto &p = parts[i];
+		for (auto &p : parts) {
 			if (dt != fixed_real(0.0)) {
 				if (cond(p.t, p.dt, t, dt)) {
 					p.v = p.v + p.g * real_type(opts.global_time ? dt : p.dt) * 0.5;
@@ -118,9 +115,10 @@ mass_attr tree::compute_mass_attributes() {
 
 std::vector<vect> tree::get_gravity_particles() const {
 	//PROFILE();
-	std::vector<vect> gparts(parts.size());
-	for (int i = 0; i < parts.size(); i++) {
-		gparts[i] = parts[i].x;
+	std::vector<vect> gparts;
+	gparts.reserve(parts.size());
+	for (auto &p : parts) {
+		gparts.push_back(p.x);
 	}
 	return gparts;
 }
@@ -196,9 +194,9 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		std::vector<vect> activeX;
 		std::vector<source> sources;
 		activeX.reserve(parts.size());
-		for (int i = 0; i < parts.size(); i++) {
-			if (opts.global_time || (parts[i].t + parts[i].dt == t + dt)) {
-				activeX.push_back(parts[i].x);
+		for (auto &p : parts) {
+			if (opts.global_time || (p.t + p.dt == t + dt)) {
+				activeX.push_back(p.x);
 			}
 		}
 		if (masses.size()) {
@@ -216,19 +214,17 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			const auto g = gravity_far(activeX, sources);
 			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 			int j = 0;
-			for (int i = 0; i < parts.size(); i++) {
-				if (parts[i].t + parts[i].dt == t + dt) {
-					parts[i].g = parts[i].g + g[j].g;
-					parts[i].phi += g[j].phi;
+			for (auto &p : parts) {
+				if (p.t + p.dt == t + dt) {
+					p.g = p.g + g[j].g;
+					p.phi += g[j].phi;
 					j++;
 				}
 			}
 			decltype(sources)().swap(sources);
 		}
 		hpx::wait_all (gfuts);
-		static arena<vect> allocator;
-		auto& plist = allocator.allocate();
-		auto& flist = allocator.allocate();
+		std::vector<vect> plist, flist;
 		for (auto &n : gfuts) {
 			auto pj = n.get();
 			plist.insert(plist.end(), pj.begin(), pj.end());
@@ -249,31 +245,29 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			{
 				std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 				int j = 0;
-				for (int i = 0; i < parts.size(); i++) {
-					if (opts.global_time || (parts[i].t + parts[i].dt == t + dt)) {
-						parts[i].g = parts[i].g + g[j].g;
-						parts[i].phi += g[j].phi;
+				for (auto &p : parts) {
+					if (opts.global_time || (p.t + p.dt == t + dt)) {
+						p.g = p.g + g[j].g;
+						p.phi += g[j].phi;
 						j++;
 					}
 				}
 			}
 		}
-		allocator.deallocate(flist);
 		if (plist.size()) {
 			const auto g = gravity_near(activeX, std::move(plist), opts.ewald);
 			{
 				std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 				int j = 0;
-				for (int i = 0; i < parts.size(); i++) {
-					if (opts.global_time || (parts[i].t + parts[i].dt == t + dt)) {
-						parts[i].g = parts[i].g + g[j].g;
-						parts[i].phi += g[j].phi;
+				for (auto &p : parts) {
+					if (opts.global_time || (p.t + p.dt == t + dt)) {
+						p.g = p.g + g[j].g;
+						p.phi += g[j].phi;
 						j++;
 					}
 				}
 			}
 		}
-		allocator.deallocate(plist);
 	} else {
 		std::array<hpx::future<void>, NCHILD> cfuts;
 		std::vector < hpx::id_type > leaf_nids;

@@ -2,5 +2,6 @@
 
 
 #include <ntiger/particle.hpp>
+#include <ntiger/list.hpp>
 
-std::vector<particle> get_initial_particles(const std::string&, int);
+list<particle> get_initial_particles(const std::string&, int);

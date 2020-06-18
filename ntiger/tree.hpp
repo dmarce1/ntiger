@@ -8,9 +8,10 @@
 #ifndef TREE_SERVER_CPP_
 #define TREE_SERVER_CPP_
 
-#include "particle.hpp"
-#include "range.hpp"
-#include "fixed_real.hpp"
+#include <ntiger/list.hpp>
+#include <ntiger/particle.hpp>
+#include <ntiger/range.hpp>
+#include <ntiger/fixed_real.hpp>
 
 #include <hpx/include/components.hpp>
 #include <hpx/runtime/components/server/migrate_component.hpp>
@@ -57,7 +58,7 @@ struct mass_attr {     // 28
 };
 
 class tree: public hpx::components::component_base<tree>  { // 196
-	std::vector<particle> parts;						// 16
+	list<particle> parts;								// 16
 	std::array<node_attr, NCHILD> children;				// 64
 	std::array<int, NCHILD> child_loads;				// 8
 	hpx::id_type parent;                                // 8
@@ -70,9 +71,9 @@ class tree: public hpx::components::component_base<tree>  { // 196
 public:
 
 	tree();
-	tree(const std::vector<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads, const range &_box,
+	tree(const list<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads, const range &_box,
 			bool _leaf);
-	tree(std::vector<particle>&&, const range&);
+	tree(list<particle>&&, const range&);
 
 	void apply_boost(vect);
 	void apply_gravity(fixed_real, fixed_real, bool);
@@ -83,8 +84,8 @@ public:
 	void compute_interactions();
 	int compute_workload();
 	void create_children();
-	std::vector<particle> destroy();
-	void find_home(const std::vector<particle>&);
+	list<particle> destroy();
+	void find_home(const list<particle>&);
 	tree_attr finish_drift();
 	tree_attr get_attributes() const;
 	std::array<hpx::id_type, NCHILD> get_children() const;
@@ -93,7 +94,7 @@ public:
 	hpx::id_type get_parent() const;
 	void rescale(real factor, range mybox);
 	void redistribute_workload(int, int);
-	void send_particles(const std::vector<particle>&);
+	void send_particles(const list<particle>&);
 	void set_self_and_parent(const hpx::id_type, const hpx::id_type);
 	tree_stats tree_statistics() const;
 	void keplerize();

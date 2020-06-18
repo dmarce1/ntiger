@@ -58,6 +58,7 @@ set(common_header_files
 
 
 set(ntiger_header_files
+	ntiger/list.hpp
 	ntiger/initialize.hpp
 	ntiger/range.hpp
 	ntiger/rand.hpp

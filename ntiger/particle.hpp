@@ -31,7 +31,6 @@ struct particle {
 		a & phi;
 	}
 	particle() {
-		t = dt = 0.0;
 	}
 };
 

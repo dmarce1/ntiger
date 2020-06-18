@@ -31,14 +31,13 @@ bool options::process_options(int argc, char *argv[]) {
 
 	command_opts.add_options() //
 	("help", "produce help message") //
-	("cfl", po::value<double>(&cfl)->default_value(0.03), "CFL factor") //
+	("cfl", po::value<double>(&cfl)->default_value(0.2), "CFL factor") //
 	("checkpoint", po::value < std::string > (&checkpoint)->default_value(""), "checkpoint file") //
 	("config_file", po::value < std::string > (&config_file)->default_value(""), "configuration file") //
 	("cuda", po::value<bool>(&cuda)->default_value(false), "enable CUDA") //
 	("ewald", po::value<bool>(&ewald)->default_value(true), "enable periodic BC") //
 	("kernel_size", po::value<double>(&kernel_size)->default_value(-1), "softening length (0.01)") //
 	("fpe", po::value<bool>(&fpe)->default_value(true), "enable floating point exceptions") //
-	("global_time", po::value<bool>(&global_time)->default_value(false), "enable global time-stepping") //
 	("gravity", po::value<bool>(&gravity)->default_value(true), "enable gravity") //
 	("grid_size", po::value<double>(&grid_size)->default_value(1.0), "size of grid") //
 	("output_freq", po::value<double>(&output_freq)->default_value(-1), "output frequency") //
@@ -71,7 +70,7 @@ bool options::process_options(int argc, char *argv[]) {
 		output_freq = tmax / 100.0;
 	}
 	if (kernel_size <= 0) {
-		kernel_size = 0.01 * pow(problem_size, -1.0 / 3.0);
+		kernel_size = 0.02 * pow(problem_size, -1.0 / 3.0);
 	}
 
 //	}
@@ -88,7 +87,6 @@ bool options::process_options(int argc, char *argv[]) {
 	SHOW(cfl);
 	SHOW(cuda);
 	SHOW(fpe);
-	SHOW(global_time);
 	SHOW(gravity);
 	SHOW(kernel_size);
 	SHOW(parts_per_node);

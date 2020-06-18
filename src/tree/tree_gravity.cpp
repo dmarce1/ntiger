@@ -7,53 +7,35 @@
 //constexpr real G = 6.67259e-8;
 constexpr real G = 1;
 
-fixed_real tree::apply_gravity(fixed_real t, fixed_real dt, bool first_kick) {
+fixed_real tree::apply_gravity(fixed_real t, fixed_real dt) {
 	const static auto opts = options::get();
 	const auto h = opts.kernel_size;
 	fixed_real tmin = fixed_real::max();
 	//PROFILE();
-	const auto first_condition = [](fixed_real t0, fixed_real dt0, fixed_real t1, fixed_real dt1) {
-		return t0 == t1;
-	};
-	const auto second_condition = [](fixed_real t0, fixed_real dt0, fixed_real t1, fixed_real dt1) {
-		return t0 + dt0 == t1 + dt1;
-	};
-	const auto always = [](fixed_real t0, fixed_real dt0, fixed_real t1, fixed_real dt1) {
-		return true;
-	};
-	std::function<bool(fixed_real, fixed_real, fixed_real, fixed_real)> cond;
-	if (opts.global_time) {
-		cond = always;
-	} else if (first_kick) {
-		cond = first_condition;
-	} else {
-		cond = second_condition;
-	}
 	if (leaf) {
 		for (auto &p : parts) {
-			if (cond(p.t, p.dt, t, dt)) {
-				p.v = p.v + p.g * real_type(opts.global_time ? dt : p.dt) * 0.5;
-				if (!first_kick) {
-					p.t += opts.global_time ? dt : p.dt;
-					p.dt = fixed_real::max();
-					const auto a = abs(p.g);
-					if (a > 0.0) {
-						const real this_dt = sqrt(h / a);
-						if (this_dt < (double) fixed_real::max()) {
-							p.dt = double(min(p.dt, fixed_real(this_dt.get())));
-						}
+			if (p.t + p.dt == t + dt) {
+				p.v = p.v + p.g * real_type(p.dt) * 0.5;
+				p.t += p.dt;
+				p.dt = fixed_real::max();
+				const auto a = abs(p.g);
+				if (a > 0.0) {
+					const real this_dt = sqrt(h / a);
+					if (this_dt < (double) fixed_real::max()) {
+						p.dt = double(min(p.dt, fixed_real(this_dt.get())));
 					}
-					p.dt *= opts.cfl;
-					p.dt = p.dt.nearest_log2();
-					p.dt = min(p.dt, (t + dt).next_bin() - (t + dt));
-					tmin = min(tmin, p.dt);
 				}
+				p.dt *= opts.cfl;
+				p.dt = p.dt.nearest_log2();
+				p.dt = min(p.dt, (t + dt).next_bin() - (t + dt));
+				tmin = min(tmin, p.dt);
+				p.v = p.v + p.g * real_type(p.dt) * 0.5;
 			}
 		}
 	} else {
 		std::array<hpx::future<fixed_real>, NCHILD> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < apply_gravity_action > (children[ci].id, t, dt, first_kick);
+			futs[ci] = hpx::async < apply_gravity_action > (children[ci].id, t, dt);
 		}
 		for (int ci = 0; ci < NCHILD; ci++) {
 			tmin = min(tmin, futs[ci].get());
@@ -189,7 +171,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		}
 		if (!self_call) {
 			for (auto &pi : parts) {
-				if (pi.t + pi.dt == t + dt || opts.global_time) {
+				if (pi.t + pi.dt == t + dt) {
 					pi.g = vect(0);
 					pi.phi = 0.0;
 				}
@@ -213,7 +195,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		std::vector<source> sources;
 		activeX.reserve(parts.size());
 		for (auto &p : parts) {
-			if (opts.global_time || (p.t + p.dt == t + dt)) {
+			if (p.t + p.dt == t + dt) {
 				activeX.push_back(p.x);
 			}
 		}
@@ -264,7 +246,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 				int j = 0;
 				for (auto &p : parts) {
-					if (opts.global_time || (p.t + p.dt == t + dt)) {
+					if (p.t + p.dt == t + dt) {
 						p.g = p.g + g[j].g;
 						p.phi += g[j].phi;
 						j++;
@@ -278,7 +260,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 				int j = 0;
 				for (auto &p : parts) {
-					if (opts.global_time || (p.t + p.dt == t + dt)) {
+					if (p.t + p.dt == t + dt) {
 						p.g = p.g + g[j].g;
 						p.phi += g[j].phi;
 						j++;

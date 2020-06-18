@@ -9,7 +9,6 @@ public:
 	bool cuda;
 	bool ewald;
 	bool fpe;
-	bool global_time;
 	bool gravity;
 	int parts_per_node;
 	int problem_size;
@@ -29,7 +28,6 @@ public:
 		arc & config_file;
 		arc & ewald;
 		arc & fpe;
-		arc & global_time;
 		arc & gravity;
 		arc & kernel_size;
 		arc & parts_per_node;

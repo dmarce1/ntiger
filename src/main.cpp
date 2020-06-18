@@ -7,14 +7,12 @@
 
 hpx::id_type root;
 
-fixed_real solve_gravity(fixed_real t, fixed_real dt, bool first_kick) {
+fixed_real solve_gravity(fixed_real t, fixed_real dt) {
 	static const auto opts = options::get();
-	if (opts.gravity && !first_kick) {
-		//	printf("Multipoles\n");
-		tree::compute_mass_attributes_action()(root);
-		//	printf("Interactions\n");
-		tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
-	}
+	//	printf("Multipoles\n");
+	tree::compute_mass_attributes_action()(root);
+	//	printf("Interactions\n");
+	tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
 //	printf("Applying\n");
 	return tree::apply_gravity_action()(root, t, dt, first_kick);
 }
@@ -82,7 +80,7 @@ int hpx_main(int argc, char *argv[]) {
 	printf("Initial load balance\n");
 	drift(t, 0.0);
 	printf("Initial gravity solve\n");
-	fixed_real dt = solve_gravity(t, 0.0, false);
+	fixed_real dt = solve_gravity(t, 0.0);
 	if (opts.problem == "plummer") {
 		tree::virialize_action()(root);
 	} else if (opts.problem == "toomre") {
@@ -107,11 +105,11 @@ int hpx_main(int argc, char *argv[]) {
 		printf("ek = %13.6e ep = %13.6e ev = %13.6e verr = %13.6e etot = %13.6e\n", s.ek.get(), s.ep.get(), s.ev.get(),
 				s.ev.get() / (std::abs(s.ep.get()) + 1.0e-100), s.ek.get() + s.ep.get());
 //		printf("gravity\n");
-		solve_gravity(t, dt, true);
+//		solve_gravity(t, dt, true);
 //		printf("drift\n");
 		drift(t, dt);
 //		printf("gravity\n");
-		const auto new_dt = solve_gravity(t, dt, false);
+		const auto new_dt = solve_gravity(t, dt);
 //		printf("rescale\n");
 		t += dt;
 		if (int((last_output / fixed_real(opts.output_freq))) != int(((t / fixed_real(opts.output_freq))))) {

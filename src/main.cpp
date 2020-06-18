@@ -14,7 +14,7 @@ fixed_real solve_gravity(fixed_real t, fixed_real dt) {
 	//	printf("Interactions\n");
 	tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
 //	printf("Applying\n");
-	return tree::apply_gravity_action()(root, t, dt, first_kick);
+	return tree::apply_gravity_action()(root, t, dt);
 }
 
 void drift(fixed_real t, fixed_real dt) {
@@ -64,7 +64,7 @@ int hpx_main(int argc, char *argv[]) {
 	init(t, 0.0);
 	const auto localities = hpx::find_all_localities();
 	for (int i = 0; i < 100; i++) {
-		printf("%i\n", i);
+//		printf("%i\n", i);
 		auto parts = get_initial_particles(opts.problem, opts.problem_size / 100.0);
 		tree::find_home_action()(root, std::move(parts));
 		tree::finish_drift_action()(root);

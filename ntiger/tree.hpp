@@ -57,7 +57,6 @@ struct mass_attr {     // 28
 };
 
 class tree: public hpx::components::component_base<tree>  { // 196
-	std::vector<particle> new_parts;
 	std::vector<particle> parts;						// 16
 	std::array<node_attr, NCHILD> children;				// 64
 	std::array<int, NCHILD> child_loads;				// 8

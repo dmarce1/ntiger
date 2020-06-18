@@ -73,10 +73,10 @@ int hpx_main(int argc, char *argv[]) {
 	root = hpx::new_ < tree > (hpx::find_here(), std::vector<particle>(), box).get();
 	init(t, 0.0);
 	const auto localities = hpx::find_all_localities();
-	for (int i = 0; i < 100; i++) {
+	for (int i = 0; i < 128; i++) {
 		printf("%i\n", i);
 		std::vector<particle> parts;
-		parts = get_initial_particles(opts.problem, opts.problem_size / 100.0);
+		parts = get_initial_particles(opts.problem, opts.problem_size / 128.0);
 		tree::find_home_action()(root, std::move(parts));
 		tree::finish_drift_action()(root);
 		if( localities.size() ) {

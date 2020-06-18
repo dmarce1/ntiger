@@ -169,8 +169,6 @@ tree_attr tree::finish_drift() {
 	static const auto opts = options::get();
 	const auto npart_max = opts.parts_per_node;
 	if (leaf) {
-		parts.insert(parts.end(), new_parts.begin(), new_parts.end());
-		decltype(new_parts)().swap(new_parts);
 		if (parts.size() > npart_max) {
 			create_children();
 		} else if (parts.size() != parts.capacity()) {
@@ -294,7 +292,7 @@ void tree::send_particles(const std::vector<particle> &pj) {
 	std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 	PROFILE();
 	for (auto p : pj) {
-		new_parts.push_back(std::move(p));
+		parts.push_back(std::move(p));
 	}
 }
 

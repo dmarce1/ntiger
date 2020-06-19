@@ -10,7 +10,7 @@ hpx::id_type root;
 fixed_real solve_gravity(fixed_real t, fixed_real dt) {
 	static const auto opts = options::get();
 	tree::compute_mass_attributes_action()(root);
-	return tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<source>(), t, dt, false);
+	return tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<source>(), t, dt);
 }
 
 void drift(fixed_real t, fixed_real dt) {

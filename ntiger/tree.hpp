@@ -97,7 +97,7 @@ public:
 	void apply_boost(vect);
 	mass_attr compute_mass_attributes();
 	void compute_drift(fixed_real);
-	fixed_real compute_gravity(std::vector<hpx::id_type>, std::vector<source>, fixed_real, fixed_real, bool self_call);
+	fixed_real compute_gravity(std::vector<hpx::id_type>, std::vector<source>, fixed_real, fixed_real);
 	void compute_interactions();
 	int compute_workload();
 	void create_children();

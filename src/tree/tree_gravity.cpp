@@ -94,7 +94,7 @@ monopole_attr tree::get_monopole_attributes() const {
 	return mono;
 }
 
-fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<source> masses, fixed_real t, fixed_real dt, bool self_call) {
+fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, std::vector<source> sources, fixed_real t, fixed_real dt) {
 	const static auto opts = options::get();
 	const auto theta = opts.theta;
 	const auto h = options::get().kernel_size;
@@ -102,16 +102,16 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<sou
 	fixed_real tmin = fixed_real::max();
 	std::vector < hpx::future < monopole_attr >> futs;
 	std::vector < hpx::future<std::array<hpx::id_type, NCHILD>> > ncfuts;
-	for (const auto &n : nids) {
+	for (const auto &n : checklist) {
 		futs.push_back(hpx::async < get_monopole_attributes_action > (n));
 	}
 	const auto rmaxA = min(rmaxb, rmaxs);
 	const auto ZA = Xcom;
 	if (leaf) {
-		std::vector < hpx::id_type > near;
+		std::vector < hpx::id_type > direct;
 		ncfuts.clear();
 //		printf( "Getting masses\n");
-		for (int i = 0; i < nids.size(); i++) {
+		for (int i = 0; i < checklist.size(); i++) {
 			const auto tmp = futs[i].get();
 			const auto rmaxB = tmp.radius;
 			const auto ZB = tmp.com;
@@ -125,39 +125,23 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<sou
 				source s;
 				s.m = tmp.mtot;
 				s.x = tmp.com;
-				masses.push_back(s);
+				sources.push_back(s);
 			} else if (tmp.leaf) {
-				near.push_back(nids[i]);
+				direct.push_back(checklist[i]);
 			} else {
-				ncfuts.push_back(hpx::async < get_children_action > (nids[i]));
+				ncfuts.push_back(hpx::async < get_children_action > (checklist[i]));
 			}
 		}
-//		if( masses.size()) {
-//			printf( "%i\n", masses.size());
-//		}
-		nids.clear();
+
+		checklist.clear();
 		for (auto &f : ncfuts) {
 			const auto tmp = f.get();
-			nids.insert(nids.end(), tmp.begin(), tmp.end());
+			checklist.insert(checklist.end(), tmp.begin(), tmp.end());
 		}
-		if (!self_call) {
-			for (auto &pi : parts) {
-				if (pi.t + pi.dt == t + dt) {
-					pi.g = vect(0);
-					pi.phi = 0.0;
-				}
-			}
-		}
-		hpx::future<void> self_fut;
-		if (nids.size()) {
-			self_fut = hpx::async < compute_gravity_action > (self, nids, std::vector<source>(), t, dt, true);
-		} else {
-			self_fut = hpx::make_ready_future<void>();
-		}
-		self_fut.get();
-		std::vector < hpx::future<std::vector<vect>> > gfuts(near.size());
-		for (int i = 0; i < near.size(); i++) {
-			gfuts[i] = hpx::async < get_gravity_particles_action > (near[i]);
+
+		std::vector < hpx::future<std::vector<vect>> > gfuts(direct.size());
+		for (int i = 0; i < direct.size(); i++) {
+			gfuts[i] = hpx::async < get_gravity_particles_action > (direct[i]);
 		}
 		hpx::wait_all (gfuts);
 		for (auto &n : gfuts) {
@@ -166,32 +150,26 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<sou
 				source s;
 				s.m = m;
 				s.x = x;
-				masses.push_back(s);
+				sources.push_back(s);
 			}
 		}
-		std::vector<vect> activeX;
-		activeX.reserve(parts.size());
-		for (auto &p : parts) {
-			if (p.t + p.dt == t + dt) {
-				activeX.push_back(p.x);
+		if (checklist.size()) {
+			hpx::async < compute_gravity_action > (self, checklist, std::move(sources), t, dt).get();
+		} else {
+			std::vector<vect> activeX;
+			activeX.reserve(parts.size());
+			for (auto &p : parts) {
+				if (p.t + p.dt == t + dt) {
+					activeX.push_back(p.x);
+				}
 			}
-		}
-		{
-			const auto g = direct_gravity(activeX, masses);
-			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
+			const auto g = direct_gravity(activeX, sources);
 			int j = 0;
 			for (auto &p : parts) {
 				if (p.t + p.dt == t + dt) {
-					p.g = p.g + g[j].g;
-					p.phi += g[j].phi;
+					p.g = g[j].g;
+					p.phi = g[j].phi;
 					j++;
-				}
-			}
-		}
-
-		if (!self_call) {
-			for (auto &p : parts) {
-				if (p.t + p.dt == t + dt) {
 					p.v = p.v + p.g * real_type(p.dt) * 0.5;
 					p.t += p.dt;
 					p.dt = fixed_real::max();
@@ -210,10 +188,9 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<sou
 				}
 			}
 		}
-
 	} else {
 		std::vector < hpx::id_type > leaf_nids;
-		for (int i = 0; i < nids.size(); i++) {
+		for (int i = 0; i < checklist.size(); i++) {
 			const auto tmp = futs[i].get();
 			const auto rmaxB = tmp.radius;
 			const auto ZB = tmp.com;
@@ -228,22 +205,22 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<sou
 				source s;
 				s.m = tmp.mtot;
 				s.x = tmp.com;
-				masses.push_back(s);
+				sources.push_back(s);
 			} else if (tmp.leaf) {
-				leaf_nids.push_back(nids[i]);
+				leaf_nids.push_back(checklist[i]);
 			} else {
-				ncfuts.push_back(hpx::async < get_children_action > (nids[i]));
+				ncfuts.push_back(hpx::async < get_children_action > (checklist[i]));
 			}
 		}
-		nids.clear();
-		nids.insert(nids.end(), leaf_nids.begin(), leaf_nids.end());
+		checklist.clear();
+		checklist.insert(checklist.end(), leaf_nids.begin(), leaf_nids.end());
 		for (auto &c : ncfuts) {
 			const auto tmp = c.get();
-			nids.insert(nids.end(), tmp.begin(), tmp.end());
+			checklist.insert(checklist.end(), tmp.begin(), tmp.end());
 		}
 		std::array<hpx::future<fixed_real>, NCHILD> cfuts;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			cfuts[ci] = hpx::async < compute_gravity_action > (children[ci].id, nids, masses, t, dt, false);
+			cfuts[ci] = hpx::async < compute_gravity_action > (children[ci].id, checklist, sources, t, dt);
 		}
 		hpx::wait_all(cfuts);
 		for (int ci = 0; ci < NCHILD; ci++) {

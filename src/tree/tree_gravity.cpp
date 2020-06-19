@@ -1,4 +1,3 @@
-#include <ntiger/gravity.hpp>
 #include <ntiger/math.hpp>
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
@@ -7,54 +6,12 @@
 //constexpr real G = 6.67259e-8;
 constexpr real G = 1;
 
-fixed_real tree::apply_gravity(fixed_real t, fixed_real dt) {
-	const static auto opts = options::get();
-	const auto h = opts.kernel_size;
-	fixed_real tmin = fixed_real::max();
-	//PROFILE();
-	if (leaf) {
-		for (auto &p : parts) {
-			if (p.t + p.dt == t + dt) {
-				p.v = p.v + p.g * real_type(p.dt) * 0.5;
-				p.t += p.dt;
-				p.dt = fixed_real::max();
-				const auto a = abs(p.g);
-				if (a > 0.0) {
-					const real this_dt = sqrt(h / a);
-					if (this_dt < (double) fixed_real::max()) {
-						p.dt = double(min(p.dt, fixed_real(this_dt.get())));
-					}
-				}
-				p.dt *= opts.cfl;
-				p.dt = p.dt.nearest_log2();
-				p.dt = min(p.dt, (t + dt).next_bin() - (t + dt));
-				tmin = min(tmin, p.dt);
-				p.v = p.v + p.g * real_type(p.dt) * 0.5;
-			}
-		}
-	} else {
-		std::array<hpx::future<fixed_real>, NCHILD> futs;
-		for (int ci = 0; ci < NCHILD; ci++) {
-			futs[ci] = hpx::async < apply_gravity_action > (children[ci].id, t, dt);
-		}
-		for (int ci = 0; ci < NCHILD; ci++) {
-			tmin = min(tmin, futs[ci].get());
-		}
-	}
-	return tmin;
-}
-
 mass_attr tree::compute_mass_attributes() {
 	const auto h = options::get().kernel_size;
-	auto &Xcom = mass.com;
-	auto &mtot = mass.mtot;
-	auto &rmaxs = mass.rmaxs;
-	auto &rmaxb = mass.rmaxb;
 	Xcom = vect(0);
 	mtot = 0.0;
 	rmaxs = 0.0;
 	rmaxb = 0.0;
-	mass.leaf = leaf;
 	const real m = 1.0 / options::get().problem_size;
 	if (leaf) {
 		//PROFILE();
@@ -110,6 +67,11 @@ mass_attr tree::compute_mass_attributes() {
 		}
 		rmaxs = max(rmaxs, abs(Xv - Xcom));
 	}
+	mass_attr mass;
+	mass.com = Xcom;
+	mass.rmaxs = rmaxs;
+	mass.rmaxb = rmaxb;
+	mass.mtot = mtot;
 	return mass;
 }
 
@@ -123,21 +85,27 @@ std::vector<vect> tree::get_gravity_particles() const {
 	return gparts;
 }
 
-mass_attr tree::get_mass_attributes() const {
-	return mass;
+monopole_attr tree::get_monopole_attributes() const {
+	monopole_attr mono;
+	mono.com = Xcom;           // 12
+	mono.mtot = mtot;          //  4
+	mono.radius = min(rmaxs, rmaxb);         // 4
+	mono.leaf = leaf;
+	return mono;
 }
 
-void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr> masses, fixed_real t, fixed_real dt, bool self_call) {
+fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<source> masses, fixed_real t, fixed_real dt, bool self_call) {
 	const static auto opts = options::get();
 	const auto theta = opts.theta;
 	const auto h = options::get().kernel_size;
-	std::vector < hpx::future < mass_attr >> futs;
+	fixed_real tmin = fixed_real::max();
+	std::vector < hpx::future < monopole_attr >> futs;
 	std::vector < hpx::future<std::array<hpx::id_type, NCHILD>> > ncfuts;
 	for (const auto &n : nids) {
-		futs.push_back(hpx::async < get_mass_attributes_action > (n));
+		futs.push_back(hpx::async < get_monopole_attributes_action > (n));
 	}
-	const auto rmaxA = min(mass.rmaxb, mass.rmaxs);
-	const auto ZA = mass.com;
+	const auto rmaxA = min(rmaxb, rmaxs);
+	const auto ZA = Xcom;
 	const real m = 1.0 / options::get().problem_size;
 	if (leaf) {
 		std::vector < hpx::id_type > near;
@@ -145,7 +113,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 //		printf( "Getting masses\n");
 		for (int i = 0; i < nids.size(); i++) {
 			const auto tmp = futs[i].get();
-			const auto rmaxB = min(tmp.rmaxb, tmp.rmaxs);
+			const auto rmaxB = tmp.radius;
 			const auto ZB = tmp.com;
 			real sep;
 			if (opts.ewald) {
@@ -154,7 +122,10 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				sep = abs(ZA - ZB);
 			}
 			if (sep > (rmaxA + rmaxB) / theta) {
-				masses.push_back(tmp);
+				source s;
+				s.m = tmp.mtot;
+				s.x = tmp.com;
+				masses.push_back(s);
 			} else if (tmp.leaf) {
 				near.push_back(nids[i]);
 			} else {
@@ -180,7 +151,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		hpx::future<void> self_fut;
 		if (nids.size()) {
 //			printf( "Self call\n");
-			self_fut = hpx::async < compute_gravity_action > (self, nids, std::vector<mass_attr>(), t, dt, true);
+			self_fut = hpx::async < compute_gravity_action > (self, nids, std::vector<source>(), t, dt, true);
 		} else {
 			self_fut = hpx::make_ready_future<void>();
 		}
@@ -192,7 +163,6 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 		}
 
 		std::vector<vect> activeX;
-		std::vector<source> sources;
 		activeX.reserve(parts.size());
 		for (auto &p : parts) {
 			if (p.t + p.dt == t + dt) {
@@ -200,18 +170,7 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			}
 		}
 		if (masses.size()) {
-			sources.reserve(masses.size());
-			for (int i = 0; i < masses.size(); i++) {
-				source s;
-				s.x = masses[i].com;
-				s.m = masses[i].mtot;
-				sources.push_back(s);
-			}
-			decltype(masses)().swap(masses);
-//		if( masses.size() > 0 ) {
-//			printf( "%i\n", (int) masses.size());
-//		}
-			const auto g = gravity_far(activeX, sources);
+			const auto g = gravity_far(activeX, masses);
 			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 			int j = 0;
 			for (auto &p : parts) {
@@ -221,39 +180,14 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 					j++;
 				}
 			}
-			decltype(sources)().swap(sources);
 		}
 		hpx::wait_all (gfuts);
-		std::vector<vect> plist, flist;
+		std::vector<vect> plist;
 		for (auto &n : gfuts) {
 			auto pj = n.get();
 			plist.insert(plist.end(), pj.begin(), pj.end());
 		}
-		const auto R0 = max(mass.rmaxs, mass.rmaxb);
 		int sz = plist.size();
-		for (int i = 0; i < sz; i++) {
-			if (abs(plist[i] - mass.com) + R0 < EWALD_R0) {
-				flist.push_back(plist[i]);
-				plist[i] = plist[sz - 1];
-				sz--;
-				i--;
-				plist.resize(sz);
-			}
-		}
-		if (flist.size()) {
-			const auto g = gravity_near(activeX, std::move(flist), false);
-			{
-				std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
-				int j = 0;
-				for (auto &p : parts) {
-					if (p.t + p.dt == t + dt) {
-						p.g = p.g + g[j].g;
-						p.phi += g[j].phi;
-						j++;
-					}
-				}
-			}
-		}
 		if (plist.size()) {
 			const auto g = gravity_near(activeX, std::move(plist), opts.ewald);
 			{
@@ -268,12 +202,34 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 				}
 			}
 		}
+
+		if (!self_call) {
+			for (auto &p : parts) {
+				if (p.t + p.dt == t + dt) {
+					p.v = p.v + p.g * real_type(p.dt) * 0.5;
+					p.t += p.dt;
+					p.dt = fixed_real::max();
+					const auto a = abs(p.g);
+					if (a > 0.0) {
+						const real this_dt = sqrt(h / a);
+						if (this_dt < (double) fixed_real::max()) {
+							p.dt = double(min(p.dt, fixed_real(this_dt.get())));
+						}
+					}
+					p.dt *= opts.cfl;
+					p.dt = p.dt.nearest_log2();
+					p.dt = min(p.dt, (t + dt).next_bin() - (t + dt));
+					tmin = min(tmin, p.dt);
+					p.v = p.v + p.g * real_type(p.dt) * 0.5;
+				}
+			}
+		}
+
 	} else {
-		std::array<hpx::future<void>, NCHILD> cfuts;
 		std::vector < hpx::id_type > leaf_nids;
 		for (int i = 0; i < nids.size(); i++) {
 			const auto tmp = futs[i].get();
-			const auto rmaxB = min(tmp.rmaxb, tmp.rmaxs);
+			const auto rmaxB = tmp.radius;
 			const auto ZB = tmp.com;
 			real sep;
 			if (opts.ewald) {
@@ -283,7 +239,10 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			}
 			//		printf( "%e\n", sep);
 			if (sep > (rmaxA + rmaxB) / theta) {
-				masses.push_back(tmp);
+				source s;
+				s.m = tmp.mtot;
+				s.x = tmp.com;
+				masses.push_back(s);
 			} else if (tmp.leaf) {
 				leaf_nids.push_back(nids[i]);
 			} else {
@@ -296,9 +255,14 @@ void tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<mass_attr
 			const auto tmp = c.get();
 			nids.insert(nids.end(), tmp.begin(), tmp.end());
 		}
+		std::array<hpx::future<fixed_real>, NCHILD> cfuts;
 		for (int ci = 0; ci < NCHILD; ci++) {
 			cfuts[ci] = hpx::async < compute_gravity_action > (children[ci].id, nids, masses, t, dt, false);
 		}
 		hpx::wait_all(cfuts);
+		for (int ci = 0; ci < NCHILD; ci++) {
+			tmin = min(tmin, cfuts[ci].get());
+		}
 	}
+	return tmin;
 }

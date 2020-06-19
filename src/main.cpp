@@ -9,12 +9,8 @@ hpx::id_type root;
 
 fixed_real solve_gravity(fixed_real t, fixed_real dt) {
 	static const auto opts = options::get();
-	//	printf("Multipoles\n");
 	tree::compute_mass_attributes_action()(root);
-	//	printf("Interactions\n");
-	tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<mass_attr>(), t, dt, false);
-//	printf("Applying\n");
-	return tree::apply_gravity_action()(root, t, dt);
+	return tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<source>(), t, dt, false);
 }
 
 void drift(fixed_real t, fixed_real dt) {

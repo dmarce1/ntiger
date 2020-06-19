@@ -15,7 +15,10 @@
 
 #include <hpx/include/components.hpp>
 #include <hpx/runtime/components/server/migrate_component.hpp>
+
+#include <ntiger/gravity.hpp>
 #include <ntiger/tree_stats.hpp>
+
 
 struct tree_attr {
 	bool leaf;
@@ -46,13 +49,26 @@ struct mass_attr {     // 28
 	real mtot;          //  4
 	real rmaxs;         // 4
 	real rmaxb;         // 4
-	bool leaf;          // 4
 	template<class Arc>
 	void serialize(Arc &&arc, unsigned) {
 		arc & com;
 		arc & mtot;
 		arc & rmaxs;
 		arc & rmaxb;
+	}
+};
+
+
+struct monopole_attr {     // 28
+	vect com;           // 12
+	real mtot;          //  4
+	real radius;         // 4
+	bool leaf;
+	template<class Arc>
+	void serialize(Arc &&arc, unsigned) {
+		arc & com;
+		arc & mtot;
+		arc & radius;
 		arc & leaf;
 	}
 };
@@ -66,7 +82,10 @@ class tree: public hpx::components::component_base<tree>  { // 196
 	range box;                                          // 24
 	bool leaf;                                          // 4
 	bool dead;                                          // 4
-	mass_attr mass;                                     // 28
+	vect Xcom;
+	real mtot;
+	real rmaxs;
+	real rmaxb;
 	std::shared_ptr<hpx::lcos::local::mutex> mtx;       // 32
 public:
 
@@ -76,10 +95,9 @@ public:
 	tree(list<particle>&&, const range&);
 
 	void apply_boost(vect);
-	fixed_real apply_gravity(fixed_real, fixed_real);
 	mass_attr compute_mass_attributes();
 	void compute_drift(fixed_real);
-	void compute_gravity(std::vector<hpx::id_type>, std::vector<mass_attr>, fixed_real, fixed_real, bool self_call);
+	fixed_real compute_gravity(std::vector<hpx::id_type>, std::vector<source>, fixed_real, fixed_real, bool self_call);
 	void compute_interactions();
 	int compute_workload();
 	void create_children();
@@ -89,7 +107,7 @@ public:
 	tree_attr get_attributes() const;
 	std::array<hpx::id_type, NCHILD> get_children() const;
 	std::vector<vect> get_gravity_particles() const;
-	mass_attr get_mass_attributes() const;
+	monopole_attr get_monopole_attributes() const;
 	hpx::id_type get_parent() const;
 	void rescale(real factor, range mybox);
 	void redistribute_workload(int, int);
@@ -112,11 +130,13 @@ public:
 		arc & box;
 		arc & leaf;
 		arc & dead;
-		arc & mass;
+		arc & Xcom;
+		arc & mtot;
+		arc & rmaxs;
+		arc & rmaxb;
 	}
 
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,apply_boost);
-	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,apply_gravity);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_mass_attributes);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_drift);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_interactions);
@@ -136,7 +156,7 @@ public:
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,virialize);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_attributes);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_gravity_particles);
-	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_mass_attributes);
+	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_monopole_attributes);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_parent);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_children);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,send_particles);

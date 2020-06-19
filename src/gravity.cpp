@@ -50,7 +50,7 @@ void init_ewald() {
 						x[1] = j * dx0;
 						x[2] = k * dx0;
 						if (x.dot(x) != 0.0) {
-							const double dx = 0.25 * dx0;
+							const double dx = 0.01 * dx0;
 							for (int dim = 0; dim < NDIM; dim++) {
 								auto ym = x;
 								auto yp = x;

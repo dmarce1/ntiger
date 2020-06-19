@@ -7,7 +7,7 @@
 
 #define CUDA_CHECK( a ) if( a != cudaSuccess ) printf( "CUDA error on line %i of %s : %s\n", __LINE__, __FILE__, cudaGetErrorString(a))
 
-#define P 256
+#define P 512
 
 cudaArray *eforce1 = 0;
 cudaArray *eforce2 = 0;
@@ -82,7 +82,7 @@ void set_cuda_ewald_tables(const std::array<ewald_table_t, NDIM> &f, const ewald
 __global__
 
 
-      __global__
+        __global__
 void direct_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *y, int xsize, int ysize, real h, bool ewald) {
 	__shared__ gravity
 	this_g[P];
@@ -93,6 +93,7 @@ void direct_gravity_kernel(gravity *__restrict__ g, const vect *x, const source 
 	const int l = threadIdx.x;
 	this_g[l].g = vect(0);
 	this_g[l].phi = 0.0;
+#pragma loop unroll 128
 	for (int j = l; j < ysize; j += P) {
 		vect f;
 		real phi;
@@ -101,6 +102,7 @@ void direct_gravity_kernel(gravity *__restrict__ g, const vect *x, const source 
 		auto x0 = dx;
 		vect sgn(1.0);
 		if (ewald) {
+#pragma loop unroll 3
 			for (int dim = 0; dim < NDIM; dim++) {
 				if (x0[dim] < 0.0) {
 					x0[dim] = -x0[dim];                         // 3 * 1 OP
@@ -113,6 +115,7 @@ void direct_gravity_kernel(gravity *__restrict__ g, const vect *x, const source 
 			}
 		}
 		const real r2 = x0.dot(x0);
+#pragma loop unroll 3
 		for (int dim = 0; dim < NDIM; dim++) {
 			f[dim] = 0.0;
 		}
@@ -128,6 +131,7 @@ void direct_gravity_kernel(gravity *__restrict__ g, const vect *x, const source 
 				f = f - x0 * h3inv;                                              // 6 OP
 			}
 			if (ewald) {
+#pragma loop unroll 3
 				for (int dim = 0; dim < NDIM; dim++) {
 					f[dim] *= sgn[dim];														// 3 OP
 				}
@@ -259,8 +263,8 @@ std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::
 			stop = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 			t += stop - start;
 			flops += x.size() * y.size() * 35;
-			if (t > 0.0) {
-			//if (t > last_display + 1.0) {
+			//	if (t > 0.0) {
+			if (t > last_display + 1.0e-2) {
 				printf("DIRECT %e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
 				last_display = t;
 			}

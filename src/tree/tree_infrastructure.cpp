@@ -10,14 +10,32 @@
 
 HPX_REGISTER_COMPONENT(hpx::components::component<tree>, tree);
 
+std::vector<source> tree::ewald_sources;
+
+HPX_PLAIN_ACTION(tree::set_ewald_sources, set_ewald_sources_action);
+
+void tree::set_ewald_sources(std::vector<source> s) {
+	ewald_sources = s;
+	if (hpx::get_locality_id() == 0) {
+		const auto localities = hpx::find_all_localities();
+		std::vector<hpx::future<void>> futs;
+		for (int i = 1; i < localities.size(); i++) {
+			futs.push_back(hpx::async < set_ewald_sources_action > (localities[i], s));
+		}
+		hpx::wait_all(futs);
+	}
+}
+
 tree::tree() {
 	mtx = std::make_shared<hpx::lcos::local::mutex>();
 	dead = false;
 	leaf = false;
+	id = 1;
 }
 
-tree::tree(const list<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads, const range &_box,
-		bool _leaf) {
+tree::tree(tree_id id_, const list<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads,
+		const range &_box, bool _leaf) {
+	id = id_;
 	mtx = std::make_shared<hpx::lcos::local::mutex>();
 	parts = _parts;
 	children = _children;
@@ -27,12 +45,12 @@ tree::tree(const list<particle> &_parts, const std::array<node_attr, NCHILD> &_c
 	dead = false;
 }
 
-tree::tree(list<particle> &&these_parts, const range &box_) :
+tree::tree(tree_id id_, list<particle> &&these_parts, const range &box_) :
 		box(box_), dead(false) {
 	const int sz = these_parts.size();
 	static const auto opts = options::get();
 	const auto npart_max = opts.parts_per_node;
-
+	id = id_;
 	mtx = std::make_shared<hpx::lcos::local::mutex>();
 
 	/* Create initial box if root */
@@ -101,8 +119,8 @@ void tree::create_children() {
 
 	leaf = false;
 //	printf( "%li %li\n", pr.size(), pl.size());
-	auto fl = hpx::new_ < tree > (hpx::find_here(), std::move(pl), boxl);
-	auto fr = hpx::new_ < tree > (hpx::find_here(), std::move(pr), boxr);
+	auto fl = hpx::new_ < tree > (hpx::find_here(), tree_id_child_left(id), std::move(pl), boxl);
+	auto fr = hpx::new_ < tree > (hpx::find_here(), tree_id_child_right(id), std::move(pr), boxr);
 	children[0].id = fl.get();
 	children[1].id = fr.get();
 }
@@ -119,7 +137,7 @@ void tree::find_home(const list<particle> &homeless) {
 
 	{
 		PROFILE();
-		for( auto& pi : homeless) {
+		for (auto &pi : homeless) {
 			if (in_range(pi.x, box)) {
 				self_parts.push_front(pi);
 			} else {
@@ -137,10 +155,10 @@ void tree::find_home(const list<particle> &homeless) {
 			for (int ci = 0; ci < NCHILD; ci++) {
 				list<particle> cparts;
 				for (auto i = self_parts.begin(); i != self_parts.end();) {
-					auto& p = *i;
+					auto &p = *i;
 					if (in_range(p.x, children[ci].box)) {
 						cparts.push_front(p);
-						std::swap(p,self_parts.front());
+						std::swap(p, self_parts.front());
 						i++;
 						self_parts.pop_front();
 					} else {
@@ -170,7 +188,7 @@ tree_attr tree::finish_drift() {
 	static const auto opts = options::get();
 	const auto npart_max = opts.parts_per_node;
 	if (leaf) {
-		if (parts.size() > npart_max) {
+		if (parts.size() > npart_max || tree_id_level(id) < opts.min_level) {
 			create_children();
 		}
 	} else {
@@ -188,7 +206,7 @@ tree_attr tree::finish_drift() {
 				all_leaves = false;
 			}
 		}
-		if (cparts <= npart_max && all_leaves) {
+		if (cparts <= npart_max && all_leaves && tree_id_level(id) >= opts.min_level) {
 			std::array < hpx::future<list<particle>>, NCHILD > dfuts;
 			for (int ci = 0; ci < NCHILD; ci++) {
 				dfuts[ci] = hpx::async < destroy_action > (children[ci].id);
@@ -196,7 +214,7 @@ tree_attr tree::finish_drift() {
 			for (int ci = 0; ci < NCHILD; ci++) {
 				const auto tmp = dfuts[ci].get();
 				children[ci].id = hpx::invalid_id;
-				for( auto& p : tmp) {
+				for (auto &p : tmp) {
 					parts.push_front(p);
 				}
 			}
@@ -228,7 +246,7 @@ hpx::id_type tree::get_parent() const {
 }
 
 hpx::id_type tree::migrate(const hpx::id_type &loc) {
-	auto id_fut = hpx::new_ < tree > (loc, parts, children, child_loads, box, leaf);
+	auto id_fut = hpx::new_ < tree > (loc, id, parts, children, child_loads, box, leaf);
 	auto id = id_fut.get();
 	dead = true;
 	return id;

@@ -63,6 +63,7 @@ set(ntiger_header_files
 	ntiger/range.hpp
 	ntiger/rand.hpp
 	ntiger/tree.hpp
+	ntiger/tree_id.hpp
 	ntiger/tree_stats.hpp
 )
 

@@ -8,7 +8,7 @@ constexpr int EWALD_NBIN = 64;
 
 using ewald_table_t = std::array<std::array<std::array<real, EWALD_NBIN + 1>, EWALD_NBIN + 1>, EWALD_NBIN + 1>;
 
-void ewald_force_and_pot(vect x, vect &f, real &phi, real);
+void ewald_force_and_pot(vect x, vect &f, real &phi);
 real ewald_separation(vect x);
 vect ewald_location(vect x);
 real EW(vect);
@@ -29,4 +29,6 @@ struct source {
 		a & x;
 	}
 };
+
 std::vector<gravity> direct_gravity(const std::vector<vect> &x, const std::vector<source> &y);
+std::vector<gravity> ewald_gravity(const std::vector<vect> &x, const std::vector<source> &y);

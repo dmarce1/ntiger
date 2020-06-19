@@ -80,14 +80,17 @@ void set_cuda_ewald_tables(const std::array<ewald_table_t, NDIM> &f, const ewald
 }
 
 __global__
-void gravity_kernel_newton(gravity *__restrict__ g, const vect *__restrict__ x, const source *__restrict__ y, int xsize, int ysize, real h) {
+
+
+  __global__
+void direct_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *y, int xsize, int ysize, real h, bool ewald) {
 	extern __shared__ int ptr[];
 	source *ys = (source*) ptr;
 	int base = blockIdx.x * blockDim.x;
 	int i0 = threadIdx.x + base;
 	int i = min(i0, xsize - 1);
 	gravity this_g;
-	const real dxbin = 0.5 / EWALD_NBIN;                                   // 1 OP
+	const real dxbininv = (EWALD_NBIN << 1);                                   // 1 OP
 	const real h2 = h * h;
 	const real h2t15 = 1.5 * h * h;
 	const real h3inv = 1.0 / (h * h * h);
@@ -96,24 +99,51 @@ void gravity_kernel_newton(gravity *__restrict__ g, const vect *__restrict__ x, 
 	for (int tile = 0; tile < (ysize + P - 1) / P; tile++) {
 		const int j0 = tile * P;
 		const int jmax = min((tile + 1) * P, ysize) - j0;
-		ys[threadIdx.x] = y[threadIdx.x + j0];
+		ys[threadIdx.x] = y[min(threadIdx.x + j0, ysize - 1)];
 		__syncthreads();
-#pragma loop unroll 128
+//#pragma loop unroll 128
 		for (int j = 0; j < jmax; j++) {
 			vect f;
 			real phi;
 			const auto dx = x[i] - ys[j].x; // 3 OP
 			const auto m = ys[j].m;
-			const auto r2 = dx.dot(dx); // 6 OP
-			const auto rinv = rsqrt(r2);            //1 OP
-			if (r2 > h2) {
-				const auto mr3inv = m * rinv * rinv * rinv;            //3 OP
-				this_g.g -= dx * mr3inv;            //6 OP
-				this_g.phi -= m * rinv;                //1 OP
-			} else if (r2 > 0.0) {
-				this_g.g -= dx * h3inv * m;
-				this_g.phi -= (h2t15 - 0.5 * r2) * h3inv * m;
+			auto x0 = dx;
+			vect sgn(1.0);
+			if (ewald) {
+				for (int dim = 0; dim < NDIM; dim++) {
+					if (x0[dim] < 0.0) {
+						x0[dim] = -x0[dim];                         // 3 * 1 OP
+						sgn[dim] *= -1.0;                           // 3 * 1 OP
+					}
+					if (x0[dim] > 0.5) {
+						x0[dim] = 1.0 - x0[dim];                   // 3 * 1 OP
+						sgn[dim] *= -1.0;                          // 3 * 1 OP
+					}
+				}
 			}
+			const real r2 = x0.dot(x0);
+			for (int dim = 0; dim < NDIM; dim++) {
+				f[dim] = 0.0;
+			}
+			phi = 0.0;
+			if (r2 > 0.0) {
+				const auto rinv = rsqrt(r2);            //1 OP
+				const auto r3inv = rinv * rinv * rinv;            //2 OP
+				if (r2 > h2) {
+					phi = phi - rinv;													// 2 OP
+					f = f - x0 * r3inv;														// 6 OP
+				} else {
+					phi = phi - (h2t15 - 0.5 * r2) * h3inv;							//4 OP
+					f = f - x0 * h3inv;                                              // 6 OP
+				}
+				if (ewald) {
+					for (int dim = 0; dim < NDIM; dim++) {
+						f[dim] *= sgn[dim];														// 3 OP
+					}
+				}
+			}
+			this_g.g += f * m;                                         // 3 OP
+			this_g.phi += phi * m;                                      // 1 OP
 		}
 		__syncthreads();
 	}
@@ -124,7 +154,7 @@ void gravity_kernel_newton(gravity *__restrict__ g, const vect *__restrict__ x, 
 }
 
 __global__
-void gravity_kernel_ewald(gravity *__restrict__ g, const vect *x, const source *y, int xsize, int ysize, real h) {
+void ewald_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *y, int xsize, int ysize, real h) {
 	extern __shared__ int ptr[];
 	source *ys = (source*) ptr;
 	int base = blockIdx.x * blockDim.x;
@@ -175,14 +205,6 @@ void gravity_kernel_ewald(gravity *__restrict__ g, const vect *x, const source *
 				f[1] += tex3D(ftex2, I[0], I[1], I[2]); // 2 OP
 				f[2] += tex3D(ftex3, I[0], I[1], I[2]); // 2 OP
 				phi += tex3D(ptex, I[0], I[1], I[2]); // 2 OP
-				const auto r3inv = rinv * rinv * rinv;            //2 OP
-				if (r2 > h2) {
-					phi = phi - rinv;													// 2 OP
-					f = f - x0 * r3inv;														// 6 OP
-				} else {
-					phi = phi - (h2t15 - 0.5 * r2) * h3inv;							//4 OP
-					f = f - x0 * h3inv;                                              // 6 OP
-				}
 				for (int dim = 0; dim < NDIM; dim++) {
 					f[dim] *= sgn[dim];														// 3 OP
 				}
@@ -198,64 +220,120 @@ void gravity_kernel_ewald(gravity *__restrict__ g, const vect *x, const source *
 	}
 }
 
-std::vector<gravity> gravity_cuda(const std::vector<vect> &x, const std::vector<source> &y) {
+std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::vector<source> &y) {
 //	printf( "<-\n" );
-std::vector<gravity> g(x.size());
-double start, stop;
-if (x.size() > 0 && y.size() > 0) {
-bool ewald = options::get().ewald;
-real h = options::get().kernel_size;
-static thread_local gravity *cg = nullptr;
-static thread_local vect *cx = nullptr;
-static thread_local source *cy = nullptr;
-static thread_local int xmax = 0;
-static thread_local int ymax = 0;
-if (x.size() > xmax) {
-	if (xmax > 0) {
-		CUDA_CHECK(cudaFree(cg));
-		CUDA_CHECK(cudaFree(cx));
+	std::vector<gravity> g(x.size());
+	double start, stop;
+	if (x.size() > 0 && y.size() > 0) {
+		bool ewald = options::get().ewald;
+		real h = options::get().kernel_size;
+		static thread_local gravity *cg = nullptr;
+		static thread_local vect *cx = nullptr;
+		static thread_local source *cy = nullptr;
+		static thread_local int xmax = 0;
+		static thread_local int ymax = 0;
+		if (x.size() > xmax) {
+			if (xmax > 0) {
+				CUDA_CHECK(cudaFree(cg));
+				CUDA_CHECK(cudaFree(cx));
+			}
+			CUDA_CHECK(cudaMalloc((void** ) &cg, sizeof(gravity) * x.size()));
+			CUDA_CHECK(cudaMalloc((void** ) &cx, sizeof(vect) * x.size()));
+			xmax = x.size();
+		}
+		if (y.size() > ymax) {
+			if (ymax > 0) {
+				CUDA_CHECK(cudaFree(cy));
+			}
+			CUDA_CHECK(cudaMalloc((void** ) &cy, sizeof(source) * y.size()));
+			ymax = y.size();
+		}
+		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
+		dim3 dimBlock(P, 1);
+		dim3 dimGrid((x.size() + P - 1) / P, 1);
+		if (true) {
+			start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
+		}
+
+		direct_gravity_kernel<<<dimGrid, dimBlock,P*sizeof(source)>>>(cg,cx,cy,x.size(),y.size(), h, ewald);
+
+		if (true) {
+			static double last_display = 0.0;
+			static double t = 0.0;
+			static double flops = 0.0;
+			cudaDeviceSynchronize();
+			stop = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
+			t += stop - start;
+			flops += x.size() * y.size() * (ewald ? 101.0 : 20.0);
+			if (t > last_display + 1.0) {
+				printf("%e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
+				last_display = t;
+			}
+
+		}
+
+		CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
 	}
-	CUDA_CHECK(cudaMalloc((void** ) &cg, sizeof(gravity) * x.size()));
-	CUDA_CHECK(cudaMalloc((void** ) &cx, sizeof(vect) * x.size()));
-	xmax = x.size();
-}
-if (y.size() > ymax) {
-	if (ymax > 0) {
-		CUDA_CHECK(cudaFree(cy));
-	}
-	CUDA_CHECK(cudaMalloc((void** ) &cy, sizeof(source) * y.size()));
-	ymax = y.size();
-}
-CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
-CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
-dim3 dimBlock(P, 1);
-dim3 dimGrid((x.size() + P - 1) / P, 1);
-if (true) {
-	start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
-}
-if (ewald) {
-gravity_kernel_ewald<<<dimGrid, dimBlock,P*sizeof(source)>>>(cg,cx,cy,x.size(),y.size(), h);
-} else {
-gravity_kernel_newton<<<dimGrid, dimBlock,P*sizeof(source)>>>(cg,cx,cy,x.size(),y.size(), h);
-}
-
-if (true) {
-static double last_display = 0.0;
-static double t = 0.0;
-static double flops = 0.0;
-cudaDeviceSynchronize();
-stop = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
-t += stop - start;
-flops += x.size() * y.size() * (ewald ? 101.0 : 20.0);
-if (t > last_display + 1.0) {
-printf("%e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
-last_display = t;
-}
-
-}
-
-CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
-}
 //	printf( ">-\n" );
-return g;
+	return g;
+}
+
+std::vector<gravity> ewald_gravity_cuda(const std::vector<vect> &x, const std::vector<source> &y) {
+//	printf( "<-\n" );
+	std::vector<gravity> g(x.size());
+	double start, stop;
+	if (x.size() > 0 && y.size() > 0) {
+		bool ewald = options::get().ewald;
+		real h = options::get().kernel_size;
+		static thread_local gravity *cg = nullptr;
+		static thread_local vect *cx = nullptr;
+		static thread_local source *cy = nullptr;
+		static thread_local int xmax = 0;
+		static thread_local int ymax = 0;
+		if (x.size() > xmax) {
+			if (xmax > 0) {
+				CUDA_CHECK(cudaFree(cg));
+				CUDA_CHECK(cudaFree(cx));
+			}
+			CUDA_CHECK(cudaMalloc((void** ) &cg, sizeof(gravity) * x.size()));
+			CUDA_CHECK(cudaMalloc((void** ) &cx, sizeof(vect) * x.size()));
+			xmax = x.size();
+		}
+		if (y.size() > ymax) {
+			if (ymax > 0) {
+				CUDA_CHECK(cudaFree(cy));
+			}
+			CUDA_CHECK(cudaMalloc((void** ) &cy, sizeof(source) * y.size()));
+			ymax = y.size();
+		}
+		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
+		dim3 dimBlock(P, 1);
+		dim3 dimGrid((x.size() + P - 1) / P, 1);
+		if (true) {
+			start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
+		}
+
+		ewald_gravity_kernel<<<dimGrid, dimBlock,P*sizeof(source)>>>(cg,cx,cy,x.size(),y.size(), h);
+
+		if (true) {
+			static double last_display = 0.0;
+			static double t = 0.0;
+			static double flops = 0.0;
+			cudaDeviceSynchronize();
+			stop = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
+			t += stop - start;
+			flops += x.size() * y.size() * (ewald ? 101.0 : 20.0);
+			if (t > last_display + 1.0) {
+				printf("%e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
+				last_display = t;
+			}
+
+		}
+
+		CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
+	}
+//	printf( ">-\n" );
+	return g;
 }

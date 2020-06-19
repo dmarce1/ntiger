@@ -6,6 +6,25 @@
 //constexpr real G = 6.67259e-8;
 constexpr real G = 1;
 
+std::vector<source> tree::gather_ewald_sources() const {
+	const auto minlevel = options::get().min_level;
+	if (tree_id_level(id) == minlevel) {
+		std::vector<source> s(1);
+		s[0].m = mtot;
+		s[0].x = Xcom;
+		return s;
+	} else {
+		hpx::future < std::vector < source >> fl = hpx::async < gather_ewald_sources_action > (children[0].id);
+		hpx::future < std::vector < source >> fr = hpx::async < gather_ewald_sources_action > (children[1].id);
+		auto vl = fl.get();
+		auto vr = fr.get();
+		for (auto s : vr) {
+			vl.push_back(s);
+		}
+		return vl;
+	}
+}
+
 mass_attr tree::compute_mass_attributes() {
 	const auto h = options::get().kernel_size;
 	Xcom = vect(0);
@@ -163,7 +182,14 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, std::vecto
 					activeX.push_back(p.x);
 				}
 			}
-			const auto g = direct_gravity(activeX, sources);
+			auto g = direct_gravity(activeX, sources);
+			if (opts.ewald) {
+				const auto ge = ewald_gravity(activeX, ewald_sources);
+				for (int i = 0; i < g.size(); i++) {
+					g[i].g = g[i].g + ge[i].g;
+					g[i].phi = g[i].phi + ge[i].phi;
+				}
+			}
 			int j = 0;
 			for (auto &p : parts) {
 				if (p.t + p.dt == t + dt) {

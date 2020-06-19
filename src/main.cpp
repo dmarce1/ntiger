@@ -10,6 +10,9 @@ hpx::id_type root;
 fixed_real solve_gravity(fixed_real t, fixed_real dt) {
 	static const auto opts = options::get();
 	tree::compute_mass_attributes_action()(root);
+	if (opts.ewald) {
+		tree::set_ewald_sources(tree::gather_ewald_sources_action()(root));
+	}
 	return tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), std::vector<source>(), t, dt);
 }
 
@@ -56,7 +59,7 @@ int hpx_main(int argc, char *argv[]) {
 		box.min[dim] = -opts.grid_size / 2.0;
 		box.max[dim] = +opts.grid_size / 2.0;
 	}
-	root = hpx::new_ < tree > (hpx::find_here(), list<particle>(), box).get();
+	root = hpx::new_ < tree > (hpx::find_here(), 1, list<particle>(), box).get();
 	init(t, 0.0);
 	const auto localities = hpx::find_all_localities();
 	for (int i = 0; i < 100; i++) {

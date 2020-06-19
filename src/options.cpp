@@ -75,6 +75,14 @@ bool options::process_options(int argc, char *argv[]) {
 
 //	}
 //	).join();
+	if (ewald) {
+		min_level = NDIM;
+		for (real x = theta; x < 1.0; x *= 2.0) {
+			min_level += NDIM;
+		}
+	} else {
+		min_level = 0;
+	}
 	const auto loc = hpx::find_all_localities();
 	const auto sz = loc.size();
 	std::vector<hpx::future<void>> futs;
@@ -86,6 +94,7 @@ bool options::process_options(int argc, char *argv[]) {
 #define SHOW( opt ) std::cout << std::string( #opt ) << " = " << std::to_string(opt) << '\n';
 	SHOW(cfl);
 	SHOW(cuda);
+	SHOW(min_level);
 	SHOW(fpe);
 	SHOW(gravity);
 	SHOW(kernel_size);

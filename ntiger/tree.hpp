@@ -17,6 +17,7 @@
 #include <hpx/runtime/components/server/migrate_component.hpp>
 
 #include <ntiger/gravity.hpp>
+#include <ntiger/tree_id.hpp>
 #include <ntiger/tree_stats.hpp>
 
 
@@ -74,6 +75,7 @@ struct monopole_attr {     // 28
 };
 
 class tree: public hpx::components::component_base<tree>  { // 196
+	tree_id id;
 	list<particle> parts;								// 16
 	std::array<node_attr, NCHILD> children;				// 64
 	std::array<int, NCHILD> child_loads;				// 8
@@ -87,16 +89,20 @@ class tree: public hpx::components::component_base<tree>  { // 196
 	real rmaxs;
 	real rmaxb;
 	std::shared_ptr<hpx::lcos::local::mutex> mtx;       // 32
+
+	static std::vector<source> ewald_sources;
 public:
+	static void set_ewald_sources(std::vector<source>);
 
 	tree();
-	tree(const list<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads, const range &_box,
+	tree(tree_id id, const list<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads, const range &_box,
 			bool _leaf);
-	tree(list<particle>&&, const range&);
+	tree(tree_id id, list<particle>&&, const range&);
 
 	void apply_boost(vect);
 	mass_attr compute_mass_attributes();
 	void compute_drift(fixed_real);
+	std::vector<source> gather_ewald_sources() const;
 	fixed_real compute_gravity(std::vector<hpx::id_type>, std::vector<source>, fixed_real, fixed_real);
 	void compute_interactions();
 	int compute_workload();
@@ -122,6 +128,7 @@ public:
 
 	template<class Arc>
 	void serialize(Arc &&arc, unsigned) {
+		arc & id;
 		arc & parts;
 		arc & children;
 		arc & child_loads;
@@ -145,6 +152,7 @@ public:
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,find_home);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,finish_drift);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_gravity);
+	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,gather_ewald_sources);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,rescale);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,redistribute_workload);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_self_and_parent);

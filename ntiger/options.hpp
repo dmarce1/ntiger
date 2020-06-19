@@ -10,6 +10,7 @@ public:
 	bool ewald;
 	bool fpe;
 	bool gravity;
+	int min_level;
 	int parts_per_node;
 	int problem_size;
 	double theta;
@@ -22,6 +23,7 @@ public:
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
+		arc & min_level;
 		arc & cfl;
 		arc & cuda;
 		arc & checkpoint;

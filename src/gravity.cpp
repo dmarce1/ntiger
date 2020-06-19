@@ -126,7 +126,7 @@ void ewald_force_and_pot(vect x, vect &f, real &phi, real h) {
 	}
 	phi = 0.0;
 	// Skip ewald
-	if (r > 1.0e-4) {
+	if (r > 0.0) {
 		general_vect<int, NDIM> I;
 		general_vect<real, NDIM> w;
 		constexpr real dx = 0.5 / EWALD_NBIN;
@@ -160,22 +160,20 @@ void ewald_force_and_pot(vect x, vect &f, real &phi, real h) {
 		phi += potential[I[0] + 1][I[1]][I[2] + 1] * w101;
 		phi += potential[I[0] + 1][I[1] + 1][I[2]] * w110;
 		phi += potential[I[0] + 1][I[1] + 1][I[2] + 1] * w111;
-	} else {
-		phi = 2.8372975;
-	}
-	const real r3 = r * r * r;
-	if (r > h) {
-		f = f - x / r3;
-	} else if (r > 0.0) {
-		f = f - x / (h * h * h);
-	}
-	for (int dim = 0; dim < NDIM; dim++) {
-		f[dim] *= sgn[dim];
-	}
-	if (r > h) {
-		phi = phi - 1.0 / r;
-	} else if (r > 0.0) {
-		phi = phi - (1.5 * h * h - 0.5 * r * r) / (h * h * h);
+		const real r3 = r * r * r;
+		if (r > h) {
+			f = f - x / r3;
+		} else if (r > 0.0) {
+			f = f - x / (h * h * h);
+		}
+		for (int dim = 0; dim < NDIM; dim++) {
+			f[dim] *= sgn[dim];
+		}
+		if (r > h) {
+			phi = phi - 1.0 / r;
+		} else {
+			phi = phi - (1.5 * h * h - 0.5 * r * r) / (h * h * h);
+		}
 	}
 }
 
@@ -219,49 +217,7 @@ real EW(general_vect<double, NDIM> x) {
 	return M_PI / 4.0 + sum1 + sum2 + 1 / abs(x);
 }
 
-std::vector<gravity> gravity_near_cpu(const std::vector<vect> &x, const std::vector<vect> &y, bool ewald) {
-	static const real h = options::get().kernel_size;
-	static const real h2 = h * h;
-	static const real hinv = 1.0 / h;
-	static const real h3inv = hinv * hinv * hinv;
-	static const real m = 1.0 / options::get().problem_size;
-	const int cnt = x.size();
-	std::vector<gravity> g(cnt);
-
-	for (int i = 0; i < cnt; i++) {
-		g[i].g = vect(0);
-		g[i].phi = 0.0;
-		for (int j = 0; j < y.size(); j++) {
-			vect f;
-			real phi;
-			const auto dx = x[i] - y[j];
-			if (ewald) {
-				ewald_force_and_pot(dx, f, phi, h);
-			} else {
-				const auto r = abs(dx);
-				if (r > h) {
-					const auto rinv = 1.0 / r;
-					const auto r3inv = rinv * rinv * rinv;
-					f = -dx * r3inv;
-					phi = -rinv;
-				} else if (r > 0.0) {
-					f = -dx * h3inv;
-					phi = -(1.5 * h2 - 0.5 * r * r) * h3inv;
-				} else {
-					f = vect(0);
-					phi = 0.0;
-				}
-			}
-			g[i].g = g[i].g + f;
-			g[i].phi += phi;
-		}
-		g[i].g = g[i].g * m;
-		g[i].phi *= m;
-	}
-	return g;
-}
-
-std::vector<gravity> gravity_far_cpu(const std::vector<vect> &x, const std::vector<source> &y) {
+std::vector<gravity> gravity_cpu(const std::vector<vect> &x, const std::vector<source> &y) {
 	static const bool ewald = options::get().ewald;
 	static const real h = options::get().kernel_size;
 	static const real h2 = h * h;
@@ -301,23 +257,13 @@ std::vector<gravity> gravity_far_cpu(const std::vector<vect> &x, const std::vect
 	return g;
 }
 
-std::vector<gravity> gravity_near(const std::vector<vect> &x, const std::vector<vect> &y, bool ewald) {
-	const bool cuda = options::get().cuda;
-	if (cuda && x.size()) {
-		auto g = gravity_near_cuda(x, y, ewald);
-		return g;
-	} else {
-		return gravity_near_cpu(x, y, ewald);
-	}
-}
-
-std::vector<gravity> gravity_far(const std::vector<vect> &x, const std::vector<source> &y) {
+std::vector<gravity> direct_gravity(const std::vector<vect> &x, const std::vector<source> &y) {
 	const bool cuda = options::get().cuda;
 //	const bool cuda = false;
 	if (cuda) {
-		return gravity_far_cuda(x, y);
+		return gravity_cuda(x, y);
 	} else {
-		return gravity_far_cpu(x, y);
+		return gravity_cpu(x, y);
 	}
 }
 

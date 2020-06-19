@@ -98,6 +98,7 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<sou
 	const static auto opts = options::get();
 	const auto theta = opts.theta;
 	const auto h = options::get().kernel_size;
+	const auto m = 1.0 / options::get().problem_size;
 	fixed_real tmin = fixed_real::max();
 	std::vector < hpx::future < monopole_attr >> futs;
 	std::vector < hpx::future<std::array<hpx::id_type, NCHILD>> > ncfuts;
@@ -106,7 +107,6 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<sou
 	}
 	const auto rmaxA = min(rmaxb, rmaxs);
 	const auto ZA = Xcom;
-	const real m = 1.0 / options::get().problem_size;
 	if (leaf) {
 		std::vector < hpx::id_type > near;
 		ncfuts.clear();
@@ -150,18 +150,25 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<sou
 		}
 		hpx::future<void> self_fut;
 		if (nids.size()) {
-//			printf( "Self call\n");
 			self_fut = hpx::async < compute_gravity_action > (self, nids, std::vector<source>(), t, dt, true);
 		} else {
 			self_fut = hpx::make_ready_future<void>();
 		}
 		self_fut.get();
-//		printf("Getting particles\n");
 		std::vector < hpx::future<std::vector<vect>> > gfuts(near.size());
 		for (int i = 0; i < near.size(); i++) {
 			gfuts[i] = hpx::async < get_gravity_particles_action > (near[i]);
 		}
-
+		hpx::wait_all (gfuts);
+		for (auto &n : gfuts) {
+			auto pj = n.get();
+			for (const auto &x : pj) {
+				source s;
+				s.m = m;
+				s.x = x;
+				masses.push_back(s);
+			}
+		}
 		std::vector<vect> activeX;
 		activeX.reserve(parts.size());
 		for (auto &p : parts) {
@@ -169,8 +176,8 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<sou
 				activeX.push_back(p.x);
 			}
 		}
-		if (masses.size()) {
-			const auto g = gravity_far(activeX, masses);
+		{
+			const auto g = direct_gravity(activeX, masses);
 			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 			int j = 0;
 			for (auto &p : parts) {
@@ -178,27 +185,6 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> nids, std::vector<sou
 					p.g = p.g + g[j].g;
 					p.phi += g[j].phi;
 					j++;
-				}
-			}
-		}
-		hpx::wait_all (gfuts);
-		std::vector<vect> plist;
-		for (auto &n : gfuts) {
-			auto pj = n.get();
-			plist.insert(plist.end(), pj.begin(), pj.end());
-		}
-		int sz = plist.size();
-		if (plist.size()) {
-			const auto g = gravity_near(activeX, std::move(plist), opts.ewald);
-			{
-				std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
-				int j = 0;
-				for (auto &p : parts) {
-					if (p.t + p.dt == t + dt) {
-						p.g = p.g + g[j].g;
-						p.phi += g[j].phi;
-						j++;
-					}
 				}
 			}
 		}

@@ -29,6 +29,4 @@ struct source {
 		a & x;
 	}
 };
-
-std::vector<gravity> gravity_near(const std::vector<vect> &x, const std::vector<vect> &y, bool ewald);
-std::vector<gravity> gravity_far(const std::vector<vect> &x, const std::vector<source> &y);
+std::vector<gravity> direct_gravity(const std::vector<vect> &x, const std::vector<source> &y);

@@ -231,10 +231,6 @@ std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::
 		static thread_local source *cy = nullptr;
 		static thread_local int xmax = 0;
 		static thread_local int ymax = 0;
-		static thread_local cudaStream_t stream;
-		if( xmax == 0 ) {
-			cudaStreamCreate(&stream);
-		}
 		if (x.size() > xmax) {
 			if (xmax > 0) {
 				CUDA_CHECK(cudaFree(cg));
@@ -251,19 +247,21 @@ std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::
 			CUDA_CHECK(cudaMalloc((void** ) &cy, sizeof(source) * y.size()));
 			ymax = y.size();
 		}
-		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
-		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
 		if (true) {
 			start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 		}
-
+		cudaStream_t stream;
+		cudaStreamCreate(&stream);
+		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
 		direct_gravity_kernel<<<x.size(),P,0,stream>>>(cg,cx,cy,x.size(),y.size(), h, ewald);
+		CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
+		cudaStreamDestroy(stream);
 
 		if (true) {
 			static double last_display = 0.0;
 			static double t = 0.0;
 			static double flops = 0.0;
-			cudaDeviceSynchronize();
 			stop = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 			t += stop - start;
 			flops += x.size() * y.size() * 35;
@@ -275,7 +273,6 @@ std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::
 
 		}
 
-		CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
 	}
 //	printf( ">-\n" );
 	return g;
@@ -293,10 +290,6 @@ std::vector<gravity> ewald_gravity_cuda(const std::vector<vect> &x, const std::v
 		static thread_local source *cy = nullptr;
 		static thread_local int xmax = 0;
 		static thread_local int ymax = 0;
-		static thread_local cudaStream_t stream;
-		if( xmax == 0 ) {
-			cudaStreamCreate(&stream);
-		}
 		if (x.size() > xmax) {
 			if (xmax > 0) {
 				CUDA_CHECK(cudaFree(cg));
@@ -313,19 +306,21 @@ std::vector<gravity> ewald_gravity_cuda(const std::vector<vect> &x, const std::v
 			CUDA_CHECK(cudaMalloc((void** ) &cy, sizeof(source) * y.size()));
 			ymax = y.size();
 		}
-		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
-		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
 		if (true) {
 			start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 		}
-
+		cudaStream_t stream;
+		cudaStreamCreate(&stream);
+		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
 		ewald_gravity_kernel<<<x.size(), P,0,stream>>>(cg,cx,cy,x.size(),y.size(), h);
+		CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
+		cudaStreamDestroy(stream);
 
 		if (true) {
 			static double last_display = 0.0;
 			static double t = 0.0;
 			static double flops = 0.0;
-			cudaDeviceSynchronize();
 			stop = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 			t += stop - start;
 			flops += x.size() * y.size() * 100.0;
@@ -335,8 +330,6 @@ std::vector<gravity> ewald_gravity_cuda(const std::vector<vect> &x, const std::v
 			}
 
 		}
-
-		CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
 	}
 //	printf( ">-\n" );
 	return g;

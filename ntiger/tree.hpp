@@ -116,7 +116,7 @@ public:
 	tree_attr finish_drift();
 	tree_attr get_attributes() const;
 	std::array<hpx::id_type, NCHILD> get_children() const;
-	std::vector<vect> get_gravity_particles() const;
+	pinned_vector<vect> get_gravity_particles() const;
 	monopole_attr get_monopole_attributes() const;
 	hpx::id_type get_parent() const;
 	void rescale(real factor, range mybox);

@@ -92,10 +92,9 @@ mass_attr tree::compute_mass_attributes() {
 	return mass;
 }
 
-std::vector<vect> tree::get_gravity_particles() const {
+pinned_vector<vect> tree::get_gravity_particles() const {
 	PROFILE();
-	std::vector<vect> gparts;
-	gparts.reserve(parts.size());
+	pinned_vector<vect> gparts;
 	for (auto &p : parts) {
 		gparts.push_back(p.x);
 	}
@@ -129,7 +128,7 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, pinned_vec
 	hpx::wait_all (futs);
 
 	if (leaf) {
-		std::vector < hpx::future<std::vector<vect>> > part_futs;
+		std::vector < hpx::future<pinned_vector<vect>> > part_futs;
 		std::vector < hpx::id_type > direct;
 		{
 			PROFILE();
@@ -262,16 +261,18 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, pinned_vec
 				checklist.insert(checklist.end(), tmp.begin(), tmp.end());
 			}
 		}
+		auto tmps = sources;
 		for (int ci = 0; ci < NCHILD; ci++) {
 			if (inc_thread()) {
 				cfuts[ci] = hpx::async([this, ci, t, dt](std::vector<hpx::id_type> checklist, pinned_vector<source> sources) {
-					auto tmp = compute_gravity_action()(children[ci].id, checklist, sources, t, dt);
+					auto tmp = compute_gravity_action()(children[ci].id, checklist, std::move(sources), t, dt);
 					dec_thread();
 					return tmp;
-				},checklist, sources);
+				},checklist, std::move(sources));
 			} else {
-				cfuts[ci] = hpx::async < compute_gravity_action > (children[ci].id, checklist, sources, t, dt);
+				cfuts[ci] = hpx::async < compute_gravity_action > (children[ci].id, checklist, std::move(sources), t, dt);
 			}
+			sources = std::move(tmps);
 		}
 		hpx::wait_all(cfuts);
 		{

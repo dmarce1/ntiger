@@ -5,6 +5,10 @@
 #include <ntiger/profiler.hpp>
 #include <ntiger/tree.hpp>
 
+void yield_to_hpx() {
+	hpx::this_thread::yield();
+}
+
 hpx::id_type root;
 
 fixed_real solve_gravity(fixed_real t, fixed_real dt) {

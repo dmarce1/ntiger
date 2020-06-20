@@ -4,6 +4,8 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <chrono>
+void yield_to_hpx();
+#include <stack>
 
 #define CUDA_CHECK( a ) if( a != cudaSuccess ) printf( "CUDA error on line %i of %s : %s\n", __LINE__, __FILE__, cudaGetErrorString(a))
 
@@ -82,7 +84,7 @@ void set_cuda_ewald_tables(const std::array<ewald_table_t, NDIM> &f, const ewald
 __global__
 
 
-         __global__
+               __global__
 void direct_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *y, int xsize, int ysize, real h, bool ewald) {
 	__shared__ gravity
 	this_g[P];
@@ -216,49 +218,83 @@ void ewald_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *
 
 }
 
+struct context {
+	gravity *g;
+	vect *x;
+	source *y;
+	std::size_t xsize;
+	std::size_t ysize;
+	cudaStream_t stream;
+};
+
+std::stack<context> contexts;
+std::atomic<int> lock(0);
+
+context pop_context(std::size_t xs, std::size_t ys) {
+	while (lock++ != 0) {
+		lock--;
+	}
+	if (contexts.empty()) {
+		context ctx;
+		ctx.x = nullptr;
+		ctx.y = nullptr;
+		ctx.g = nullptr;
+		ctx.xsize = 0;
+		ctx.ysize = 0;
+		cudaStreamCreate(&ctx.stream);
+		contexts.push(ctx);
+	}
+	context ctx = contexts.top();
+	contexts.pop();
+	if (ctx.xsize < xs) {
+		CUDA_CHECK(cudaMalloc((void** ) &ctx.g, sizeof(gravity) * xs));
+		CUDA_CHECK(cudaMalloc((void** ) &ctx.x, sizeof(vect) * xs));
+		ctx.xsize = xs;
+	}
+	if (ctx.ysize < ys) {
+		CUDA_CHECK(cudaMalloc((void** ) &ctx.y, sizeof(source) * ys));
+		ctx.ysize = ys;
+	}
+	lock--;
+	return ctx;
+}
+
+void push_context(context ctx) {
+	while (lock++ != 0) {
+		lock--;
+	}
+	contexts.push(ctx);
+	lock--;
+}
+
 std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::vector<source> &y) {
 //	printf( "<-\n" );
 	std::vector<gravity> g(x.size());
 	double start, stop;
-	static thread_local cudaStream_t stream;
-	static thread_local bool stream_created = false;
-	if (!stream_created) {
-		stream_created = true;
-		cudaStreamCreate(&stream);
-	}
 
 	if (x.size() > 0 && y.size() > 0) {
 		bool ewald = options::get().ewald;
 		real h = options::get().kernel_size;
-		static thread_local gravity *cg = nullptr;
-		static thread_local vect *cx = nullptr;
-		static thread_local source *cy = nullptr;
-		static thread_local int xmax = 0;
-		static thread_local int ymax = 0;
-		if (x.size() > xmax) {
-			if (xmax > 0) {
-				CUDA_CHECK(cudaFree(cg));
-				CUDA_CHECK(cudaFree(cx));
-			}
-			CUDA_CHECK(cudaMalloc((void** ) &cg, sizeof(gravity) * x.size()));
-			CUDA_CHECK(cudaMalloc((void** ) &cx, sizeof(vect) * x.size()));
-			xmax = x.size();
-		}
-		if (y.size() > ymax) {
-			if (ymax > 0) {
-				CUDA_CHECK(cudaFree(cy));
-			}
-			CUDA_CHECK(cudaMalloc((void** ) &cy, sizeof(source) * y.size()));
-			ymax = y.size();
-		}
+		auto ctx = pop_context(x.size(), y.size());
 		if (true) {
 			start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 		}
-		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
-			CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
-		direct_gravity_kernel<<<x.size(),P,0,stream>>>(cg,cx,cy,x.size(),y.size(), h, ewald);
-				CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
+		CUDA_CHECK(cudaMemcpy(ctx.x, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(ctx.y, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
 
+		cudaEvent_t event;
+		cudaEventCreate(&event);
+
+		direct_gravity_kernel<<<x.size(),P,0,ctx.stream>>>(ctx.g,ctx.x,ctx.y,x.size(),y.size(), h, ewald);
+		cudaEventRecord(event, ctx.stream);
+
+		while (cudaEventQuery(event) != cudaSuccess) {
+			yield_to_hpx();
+		}
+
+		CUDA_CHECK(cudaMemcpy(g.data(), ctx.g, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
+
+		push_context(ctx);
 		if (true) {
 			static double last_display = 0.0;
 			static double t = 0.0;
@@ -283,43 +319,29 @@ std::vector<gravity> ewald_gravity_cuda(const std::vector<vect> &x, const std::v
 //	printf( "<-\n" );
 	std::vector<gravity> g(x.size());
 	double start, stop;
-	static thread_local cudaStream_t stream;
-	static thread_local bool stream_created = false;
-	if (!stream_created) {
-		stream_created = true;
-		cudaStreamCreate(&stream);
-	}
 	if (x.size() > 0 && y.size() > 0) {
 		bool ewald = options::get().ewald;
 		real h = options::get().kernel_size;
-		static thread_local gravity *cg = nullptr;
-		static thread_local vect *cx = nullptr;
-		static thread_local source *cy = nullptr;
-		static thread_local int xmax = 0;
-		static thread_local int ymax = 0;
-		if (x.size() > xmax) {
-			if (xmax > 0) {
-				CUDA_CHECK(cudaFree(cg));
-				CUDA_CHECK(cudaFree(cx));
-			}
-			CUDA_CHECK(cudaMalloc((void** ) &cg, sizeof(gravity) * x.size()));
-			CUDA_CHECK(cudaMalloc((void** ) &cx, sizeof(vect) * x.size()));
-			xmax = x.size();
-		}
-		if (y.size() > ymax) {
-			if (ymax > 0) {
-				CUDA_CHECK(cudaFree(cy));
-			}
-			CUDA_CHECK(cudaMalloc((void** ) &cy, sizeof(source) * y.size()));
-			ymax = y.size();
-		}
+		auto ctx = pop_context(x.size(), y.size());
 		if (true) {
 			start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 		}
-		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
-		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
-ewald_gravity_kernel<<<x.size(), P,0,stream>>>(cg,cx,cy,x.size(),y.size(), h);
-				CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
+		CUDA_CHECK(cudaMemcpy(ctx.x, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(ctx.y, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
+
+		cudaEvent_t event;
+		cudaEventCreate(&event);
+
+		ewald_gravity_kernel<<<x.size(), P,0,ctx.stream>>>(ctx.g,ctx.x,ctx.y,x.size(),y.size(), h);
+		cudaEventRecord(event, ctx.stream);
+
+		while (cudaEventQuery(event) != cudaSuccess) {
+			yield_to_hpx();
+		}
+
+		CUDA_CHECK(cudaMemcpy(g.data(), ctx.g, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
+
+		push_context(ctx);
 
 		if (true) {
 			static double last_display = 0.0;

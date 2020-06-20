@@ -1,3 +1,4 @@
+#include <ntiger/cuda_check.hpp>
 #include <ntiger/gravity.hpp>
 #include <ntiger/gravity_cuda.hpp>
 #include <ntiger/options.hpp>
@@ -6,8 +7,6 @@
 #include <chrono>
 void yield_to_hpx();
 #include <stack>
-
-#define CUDA_CHECK( a ) if( a != cudaSuccess ) printf( "CUDA error on line %i of %s : %s\n", __LINE__, __FILE__, cudaGetErrorString(a))
 
 #define P 512
 
@@ -304,7 +303,7 @@ std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::
 			flops += x.size() * y.size() * 35;
 			//	if (t > 0.0) {
 			if (t > last_display + 1.0) {
-				printf("DIRECT %e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
+//				printf("DIRECT %e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
 				last_display = t;
 			}
 
@@ -351,7 +350,7 @@ std::vector<gravity> ewald_gravity_cuda(const std::vector<vect> &x, const std::v
 			t += stop - start;
 			flops += x.size() * y.size() * 100.0;
 			if (t > last_display + 1.0) {
-				printf("%e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
+	//			printf("%e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
 				last_display = t;
 			}
 

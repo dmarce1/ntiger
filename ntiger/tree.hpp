@@ -91,6 +91,10 @@ class tree: public hpx::components::component_base<tree>  { // 196
 	std::shared_ptr<hpx::lcos::local::mutex> mtx;       // 32
 
 	static std::vector<source> ewald_sources;
+	static hpx::lcos::local::spinlock thread_mtx;
+	static int thread_cnt;
+	static bool inc_thread();
+	static void dec_thread();
 public:
 	static void set_ewald_sources(std::vector<source>);
 

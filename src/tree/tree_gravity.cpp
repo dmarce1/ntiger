@@ -1,5 +1,6 @@
 #include <ntiger/math.hpp>
 #include <ntiger/options.hpp>
+#include <ntiger/pinned_vector.hpp>
 #include <ntiger/profiler.hpp>
 #include <ntiger/tree.hpp>
 
@@ -255,7 +256,7 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, std::vecto
 			checklist.clear();
 			checklist.insert(checklist.end(), leaf_nids.begin(), leaf_nids.end());
 		}
-		hpx::wait_all(opened);
+		hpx::wait_all (opened);
 		{
 			PROFILE();
 			for (auto &c : opened) {
@@ -264,9 +265,11 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, std::vecto
 			}
 		}
 		for (int ci = 0; ci < NCHILD; ci++) {
-			if (tree_id_level(id) < 6) {
+			if (inc_thread()) {
 				cfuts[ci] = hpx::async([this, ci, t, dt](std::vector<hpx::id_type> checklist, std::vector<source> sources) {
-					return compute_gravity_action()(children[ci].id, checklist, sources, t, dt);
+					auto tmp = compute_gravity_action()(children[ci].id, checklist, sources, t, dt);
+					dec_thread();
+					return tmp;
 				},checklist, sources);
 			} else {
 				cfuts[ci] = hpx::async < compute_gravity_action > (children[ci].id, checklist, sources, t, dt);

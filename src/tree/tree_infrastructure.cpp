@@ -7,12 +7,40 @@
 #include <hpx/lcos/local/mutex.hpp>
 
 #include <set>
+#include <ntiger/initialize.hpp>
+#include <ntiger/options.hpp>
+#include <ntiger/profiler.hpp>
+#include <ntiger/tree.hpp>
+
+#include  <hpx/lcos/when_all.hpp>
+#include <hpx/lcos/local/mutex.hpp>
+
+#include <set>
 
 HPX_REGISTER_COMPONENT(hpx::components::component<tree>, tree);
 
 std::vector<source> tree::ewald_sources;
 
+hpx::lcos::local::spinlock tree::thread_mtx;
+int tree::thread_cnt = 1;
+
 HPX_PLAIN_ACTION(tree::set_ewald_sources, set_ewald_sources_action);
+
+bool tree::inc_thread() {
+	std::lock_guard < hpx::lcos::local::spinlock > lock(thread_mtx);
+	if (thread_cnt < 48) {
+		thread_cnt++;
+		return true;
+	} else {
+		return false;
+	}
+
+}
+
+void tree::dec_thread() {
+	std::lock_guard < hpx::lcos::local::spinlock > lock(thread_mtx);
+	thread_cnt--;
+}
 
 void tree::set_ewald_sources(std::vector<source> s) {
 	ewald_sources = s;
@@ -393,4 +421,5 @@ void tree::write_silo(int num, fixed_real t) const {
 		printf("Unable to convert checkpoint to SILO\n");
 	}
 }
+
 

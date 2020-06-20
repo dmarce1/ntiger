@@ -1,7 +1,9 @@
 #pragma once
 
 #include <ntiger/vect.hpp>
+#include <ntiger/pinned_vector.hpp>
 #include <vector>
+
 
 constexpr int EWALD_NBIN = 64;
 #define EWALD_R0 0.08
@@ -30,5 +32,5 @@ struct source {
 	}
 };
 
-std::vector<gravity> direct_gravity(const std::vector<vect> &x, const std::vector<source> &y);
-std::vector<gravity> ewald_gravity(const std::vector<vect> &x, const std::vector<source> &y);
+pinned_vector<gravity> direct_gravity(const pinned_vector<vect> &x, const pinned_vector<source> &y);
+pinned_vector<gravity> ewald_gravity(const pinned_vector<vect> &x, const pinned_vector<source> &y);

@@ -266,9 +266,9 @@ void push_context(context ctx) {
 	lock--;
 }
 
-std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::vector<source> &y) {
+pinned_vector<gravity> direct_gravity_cuda(const pinned_vector<vect> &x, const pinned_vector<source> &y) {
 //	printf( "<-\n" );
-	std::vector<gravity> g(x.size());
+	pinned_vector<gravity> g(x.size());
 	double start, stop;
 
 	if (x.size() > 0 && y.size() > 0) {
@@ -314,9 +314,9 @@ std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::
 	return g;
 }
 
-std::vector<gravity> ewald_gravity_cuda(const std::vector<vect> &x, const std::vector<source> &y) {
+pinned_vector<gravity> ewald_gravity_cuda(const pinned_vector<vect> &x, const pinned_vector<source> &y) {
 //	printf( "<-\n" );
-	std::vector<gravity> g(x.size());
+	pinned_vector<gravity> g(x.size());
 	double start, stop;
 	if (x.size() > 0 && y.size() > 0) {
 		bool ewald = options::get().ewald;

@@ -201,14 +201,14 @@ real EW(general_vect<double, NDIM> x) {
 	return M_PI / 4.0 + sum1 + sum2 + 1 / abs(x);
 }
 
-std::vector<gravity> direct_gravity_cpu(const std::vector<vect> &x, const std::vector<source> &y) {
+pinned_vector<gravity> direct_gravity_cpu(const pinned_vector<vect> &x, const pinned_vector<source> &y) {
 	static const bool ewald = options::get().ewald;
 	static const real h = options::get().kernel_size;
 	static const real h2 = h * h;
 	static const real hinv = 1.0 / h;
 	static const real h3inv = hinv * hinv * hinv;
 	const int cnt = x.size();
-	std::vector<gravity> g(cnt);
+	pinned_vector<gravity> g(cnt);
 
 	for (int i = 0; i < cnt; i++) {
 		g[i].g = vect(0);
@@ -257,9 +257,9 @@ std::vector<gravity> direct_gravity_cpu(const std::vector<vect> &x, const std::v
 	return g;
 }
 
-std::vector<gravity> ewald_gravity_cpu(const std::vector<vect> &x, const std::vector<source> &y) {
+pinned_vector<gravity> ewald_gravity_cpu(const pinned_vector<vect> &x, const pinned_vector<source> &y) {
 	const int cnt = x.size();
-	std::vector<gravity> g(cnt);
+	pinned_vector<gravity> g(cnt);
 
 	for (int i = 0; i < cnt; i++) {
 		g[i].g = vect(0);
@@ -276,7 +276,7 @@ std::vector<gravity> ewald_gravity_cpu(const std::vector<vect> &x, const std::ve
 	return g;
 }
 
-std::vector<gravity> direct_gravity(const std::vector<vect> &x, const std::vector<source> &y) {
+pinned_vector<gravity> direct_gravity(const pinned_vector<vect> &x, const pinned_vector<source> &y) {
 	const bool cuda = options::get().cuda;
 //	const bool cuda = false;
 	if (cuda) {
@@ -286,7 +286,7 @@ std::vector<gravity> direct_gravity(const std::vector<vect> &x, const std::vecto
 	}
 }
 
-std::vector<gravity> ewald_gravity(const std::vector<vect> &x, const std::vector<source> &y) {
+pinned_vector<gravity> ewald_gravity(const pinned_vector<vect> &x, const pinned_vector<source> &y) {
 	const bool cuda = options::get().cuda;
 //	const bool cuda = false;
 	if (cuda) {

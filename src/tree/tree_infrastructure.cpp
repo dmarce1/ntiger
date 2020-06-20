@@ -19,7 +19,8 @@
 
 HPX_REGISTER_COMPONENT(hpx::components::component<tree>, tree);
 
-std::vector<source> tree::ewald_sources;
+pinned_vector<source> tree::ewald_sources;
+
 
 hpx::lcos::local::spinlock tree::thread_mtx;
 int tree::thread_cnt = 1;
@@ -43,7 +44,10 @@ void tree::dec_thread() {
 }
 
 void tree::set_ewald_sources(std::vector<source> s) {
-	ewald_sources = s;
+	ewald_sources.resize(s.size());
+	for (int i = 0; i < s.size(); i++) {
+		ewald_sources[i] = s[i];
+	}
 	if (hpx::get_locality_id() == 0) {
 		const auto localities = hpx::find_all_localities();
 		std::vector<hpx::future<void>> futs;
@@ -421,5 +425,4 @@ void tree::write_silo(int num, fixed_real t) const {
 		printf("Unable to convert checkpoint to SILO\n");
 	}
 }
-
 

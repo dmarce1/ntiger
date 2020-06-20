@@ -90,7 +90,7 @@ class tree: public hpx::components::component_base<tree>  { // 196
 	real rmaxb;
 	std::shared_ptr<hpx::lcos::local::mutex> mtx;       // 32
 
-	static std::vector<source> ewald_sources;
+	static pinned_vector<source> ewald_sources;
 	static hpx::lcos::local::spinlock thread_mtx;
 	static int thread_cnt;
 	static bool inc_thread();
@@ -107,7 +107,7 @@ public:
 	mass_attr compute_mass_attributes();
 	void compute_drift(fixed_real);
 	std::vector<source> gather_ewald_sources() const;
-	fixed_real compute_gravity(std::vector<hpx::id_type>, std::vector<source>, fixed_real, fixed_real);
+	fixed_real compute_gravity(std::vector<hpx::id_type>, pinned_vector<source>, fixed_real, fixed_real);
 	void compute_interactions();
 	int compute_workload();
 	void create_children();

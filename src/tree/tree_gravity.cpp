@@ -1,6 +1,5 @@
 #include <ntiger/math.hpp>
 #include <ntiger/options.hpp>
-#include <ntiger/pinned_vector.hpp>
 #include <ntiger/profiler.hpp>
 #include <ntiger/tree.hpp>
 
@@ -113,7 +112,7 @@ monopole_attr tree::get_monopole_attributes() const {
 	return mono;
 }
 
-fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, std::vector<source> sources, fixed_real t, fixed_real dt) {
+fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, pinned_vector<source> sources, fixed_real t, fixed_real dt) {
 	const static auto opts = options::get();
 	const auto theta = opts.theta;
 	const auto h = options::get().kernel_size;
@@ -186,8 +185,7 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, std::vecto
 			if (checklist.size()) {
 				compute_gravity_action()(self, checklist, std::move(sources), t, dt);
 			} else {
-				std::vector<vect> activeX;
-				activeX.reserve(parts.size());
+				pinned_vector<vect> activeX;
 				for (auto &p : parts) {
 					if (p.t + p.dt == t + dt) {
 						activeX.push_back(p.x);
@@ -266,7 +264,7 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, std::vecto
 		}
 		for (int ci = 0; ci < NCHILD; ci++) {
 			if (inc_thread()) {
-				cfuts[ci] = hpx::async([this, ci, t, dt](std::vector<hpx::id_type> checklist, std::vector<source> sources) {
+				cfuts[ci] = hpx::async([this, ci, t, dt](std::vector<hpx::id_type> checklist, pinned_vector<source> sources) {
 					auto tmp = compute_gravity_action()(children[ci].id, checklist, sources, t, dt);
 					dec_thread();
 					return tmp;

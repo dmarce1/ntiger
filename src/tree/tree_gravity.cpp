@@ -246,7 +246,13 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, std::vecto
 		}
 		std::array<hpx::future<fixed_real>, NCHILD> cfuts;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			cfuts[ci] = hpx::async < compute_gravity_action > (children[ci].id, checklist, sources, t, dt);
+			if (tree_id_level(id) < 6) {
+				cfuts[ci] = hpx::async([this, ci, t, dt](std::vector<hpx::id_type> checklist, std::vector<source> sources) {
+					return compute_gravity_action()(children[ci].id, checklist, sources, t, dt);
+				},checklist, sources);
+			} else {
+				cfuts[ci] = hpx::async < compute_gravity_action > (children[ci].id, checklist, sources, t, dt);
+			}
 		}
 		hpx::wait_all(cfuts);
 		for (int ci = 0; ci < NCHILD; ci++) {

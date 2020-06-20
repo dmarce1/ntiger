@@ -154,31 +154,25 @@ void direct_gravity_kernel(gravity *__restrict__ g, const vect *x, const source 
 
 __global__
 void ewald_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *y, int xsize, int ysize, real h) {
-	extern __shared__ int ptr[];
-	source *ys = (source*) ptr;
-	int base = blockIdx.x * blockDim.x;
-	int i0 = threadIdx.x + base;
-	int i = min(i0, xsize - 1);
-	gravity this_g;
+
+
+
+	__shared__ gravity
+	this_g[P];
 	const real dxbininv = (EWALD_NBIN << 1);                                   // 1 OP
-	const real h2 = h * h;
-	const real h2t15 = 1.5 * h * h;
-	const real h3inv = 1.0 / (h * h * h);
-	this_g.g = vect(0);
-	this_g.phi = 0.0;
-	for (int tile = 0; tile < (ysize + P - 1) / P; tile++) {
-		const int j0 = tile * P;
-		const int jmax = min((tile + 1) * P, ysize) - j0;
-		ys[threadIdx.x] = y[min(threadIdx.x + j0, ysize - 1)];
-		__syncthreads();
-//#pragma loop unroll 128
-		for (int j = 0; j < jmax; j++) {
-			vect f;
-			real phi;
-			const auto dx = x[i] - ys[j].x; // 3 OP
-			const auto m = ys[j].m;
-			auto x0 = dx;
-			vect sgn(1.0);
+	const int i = blockIdx.x;
+	const int l = threadIdx.x;
+	this_g[l].g = vect(0);
+	this_g[l].phi = 0.0;
+#pragma loop unroll 128
+	for (int j = l; j < ysize; j += P) {
+		vect f;
+		real phi;
+		const auto dx = x[i] - y[j].x; // 3 OP
+		const auto m = y[j].m;
+		auto x0 = dx;
+		vect sgn(1.0);
+#pragma loop unroll 3
 			for (int dim = 0; dim < NDIM; dim++) {
 				if (x0[dim] < 0.0) {
 					x0[dim] = -x0[dim];                         // 3 * 1 OP
@@ -187,36 +181,42 @@ void ewald_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *
 				if (x0[dim] > 0.5) {
 					x0[dim] = 1.0 - x0[dim];                   // 3 * 1 OP
 					sgn[dim] *= -1.0;                          // 3 * 1 OP
-				}
 			}
-			const real r2 = x0.dot(x0);
+		}
+		const real r2 = x0.dot(x0);
+#pragma loop unroll 3
+		for (int dim = 0; dim < NDIM; dim++) {
+			f[dim] = 0.0;
+		}
+		phi = 0.0;
+		if (r2 > 0.0) {
+			general_vect<float, NDIM> I;
 			for (int dim = 0; dim < NDIM; dim++) {
-				f[dim] = 0.0;
+				I[dim] = (x0[dim] * dxbininv).get() + 0.5; // 3 * 2 OP
 			}
-			phi = 0.0;
-			if (r2 > 0.0) {
-				const auto rinv = rsqrt(r2);            //1 OP
-				general_vect<float, NDIM> I;
-				for (int dim = 0; dim < NDIM; dim++) {
-					I[dim] = (x0[dim] * dxbininv).get() + 0.5; // 3 * 2 OP
-				}
-				f[0] += tex3D(ftex1, I[0], I[1], I[2]); // 2 OP
-				f[1] += tex3D(ftex2, I[0], I[1], I[2]); // 2 OP
-				f[2] += tex3D(ftex3, I[0], I[1], I[2]); // 2 OP
-				phi += tex3D(ptex, I[0], I[1], I[2]); // 2 OP
-				for (int dim = 0; dim < NDIM; dim++) {
-					f[dim] *= sgn[dim];														// 3 OP
-				}
+			f[0] += tex3D(ftex1, I[0], I[1], I[2]); // 2 OP
+			f[1] += tex3D(ftex2, I[0], I[1], I[2]); // 2 OP
+			f[2] += tex3D(ftex3, I[0], I[1], I[2]); // 2 OP
+			phi += tex3D(ptex, I[0], I[1], I[2]); // 2 OP
+			for (int dim = 0; dim < NDIM; dim++) {
+				f[dim] *= sgn[dim];														// 3 OP
 			}
-			this_g.g += f * m;                                         // 3 OP
-			this_g.phi += phi * m;                                      // 1 OP
+		}
+		this_g[l].g += f * m;                                         // 3 OP
+		this_g[l].phi += phi * m;                                      // 1 OP
+	}
+	__syncthreads();
+	for (int N = P / 2; N > 0; N >>= 1) {
+		if (l < N) {
+			this_g[l].g += this_g[l + N].g;
+			this_g[l].phi += this_g[l + N].phi;
 		}
 		__syncthreads();
 	}
-	if (i == i0) {
-		g[i].g = this_g.g; // 1 OP
-		g[i].phi = this_g.phi; // 1 OP
-	}
+	g[i].g = this_g[0].g; // 1 OP
+	g[i].phi = this_g[0].phi; // 1 OP
+
+
 }
 
 std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::vector<source> &y) {
@@ -231,6 +231,10 @@ std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::
 		static thread_local source *cy = nullptr;
 		static thread_local int xmax = 0;
 		static thread_local int ymax = 0;
+		static thread_local cudaStream_t stream;
+		if( xmax == 0 ) {
+			cudaStreamCreate(&stream);
+		}
 		if (x.size() > xmax) {
 			if (xmax > 0) {
 				CUDA_CHECK(cudaFree(cg));
@@ -253,7 +257,7 @@ std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::
 			start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 		}
 
-		direct_gravity_kernel<<<x.size(),P>>>(cg,cx,cy,x.size(),y.size(), h, ewald);
+		direct_gravity_kernel<<<x.size(),P,0,stream>>>(cg,cx,cy,x.size(),y.size(), h, ewald);
 
 		if (true) {
 			static double last_display = 0.0;
@@ -289,6 +293,10 @@ std::vector<gravity> ewald_gravity_cuda(const std::vector<vect> &x, const std::v
 		static thread_local source *cy = nullptr;
 		static thread_local int xmax = 0;
 		static thread_local int ymax = 0;
+		static thread_local cudaStream_t stream;
+		if( xmax == 0 ) {
+			cudaStreamCreate(&stream);
+		}
 		if (x.size() > xmax) {
 			if (xmax > 0) {
 				CUDA_CHECK(cudaFree(cg));
@@ -307,13 +315,11 @@ std::vector<gravity> ewald_gravity_cuda(const std::vector<vect> &x, const std::v
 		}
 		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
 		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
-		dim3 dimBlock(P, 1);
-		dim3 dimGrid((x.size() + P - 1) / P, 1);
 		if (true) {
 			start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 		}
 
-		ewald_gravity_kernel<<<dimGrid, dimBlock,P*sizeof(source)>>>(cg,cx,cy,x.size(),y.size(), h);
+		ewald_gravity_kernel<<<x.size(), P,0,stream>>>(cg,cx,cy,x.size(),y.size(), h);
 
 		if (true) {
 			static double last_display = 0.0;

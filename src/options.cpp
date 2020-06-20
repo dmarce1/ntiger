@@ -41,7 +41,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("gravity", po::value<bool>(&gravity)->default_value(true), "enable gravity") //
 	("grid_size", po::value<double>(&grid_size)->default_value(1.0), "size of grid") //
 	("output_freq", po::value<double>(&output_freq)->default_value(-1), "output frequency") //
-	("parts_per_node", po::value<int>(&parts_per_node)->default_value(2048), "maximum number of particles on a node") //
+	("parts_per_node", po::value<int>(&parts_per_node)->default_value(1024), "maximum number of particles on a node") //
 	("problem_size", po::value<int>(&problem_size)->default_value(100), "problem size") //
 	("problem", po::value < std::string > (&problem)->default_value("sod"), "problem name") //
 	("theta", po::value<double>(&theta)->default_value(0.35), "theta for Barnes-Hut") //

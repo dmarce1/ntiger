@@ -135,16 +135,13 @@ void tree::find_home(const list<particle> &homeless) {
 	list<particle> self_parts;
 	list<particle> parent_parts;
 
-	{
-		PROFILE();
-		for (auto &pi : homeless) {
-			if (in_range(pi.x, box)) {
-				self_parts.push_front(pi);
-			} else {
-				parent_parts.push_front(pi);
-			}
-
+	for (auto &pi : homeless) {
+		if (in_range(pi.x, box)) {
+			self_parts.push_front(pi);
+		} else {
+			parent_parts.push_front(pi);
 		}
+
 	}
 	hpx::future<void> self_fut;
 	if (self_parts.size()) {
@@ -304,7 +301,6 @@ void tree::redistribute_workload(int current, int total) {
 
 void tree::send_particles(const list<particle> &pj) {
 	std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
-	PROFILE();
 	for (auto p : pj) {
 		parts.push_front(std::move(p));
 	}

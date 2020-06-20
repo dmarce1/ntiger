@@ -33,7 +33,6 @@ mass_attr tree::compute_mass_attributes() {
 	rmaxb = 0.0;
 	const real m = 1.0 / options::get().problem_size;
 	if (leaf) {
-		//PROFILE();
 		rmaxb = 0.0;
 		if (parts.size()) {
 			for (const auto &p : parts) {
@@ -72,7 +71,6 @@ mass_attr tree::compute_mass_attributes() {
 			rmaxb = 0.0;
 		}
 	}
-	//PROFILE();
 	vect Xv;
 	for (int i = 0; i < NCHILD; i++) {
 		int m = i;
@@ -95,7 +93,7 @@ mass_attr tree::compute_mass_attributes() {
 }
 
 std::vector<vect> tree::get_gravity_particles() const {
-	//PROFILE();
+	PROFILE();
 	std::vector<vect> gparts;
 	gparts.reserve(parts.size());
 	for (auto &p : parts) {
@@ -105,6 +103,7 @@ std::vector<vect> tree::get_gravity_particles() const {
 }
 
 monopole_attr tree::get_monopole_attributes() const {
+	PROFILE();
 	monopole_attr mono;
 	mono.com = Xcom;           // 12
 	mono.mtot = mtot;          //  4
@@ -120,131 +119,150 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, std::vecto
 	const auto m = 1.0 / options::get().problem_size;
 	fixed_real tmin = fixed_real::max();
 	std::vector < hpx::future < monopole_attr >> futs;
-	std::vector < hpx::future<std::array<hpx::id_type, NCHILD>> > ncfuts;
+	std::vector < hpx::future<std::array<hpx::id_type, NCHILD>> > opened;
 	for (const auto &n : checklist) {
 		futs.push_back(hpx::async < get_monopole_attributes_action > (n));
 	}
 	const auto rmaxA = min(rmaxb, rmaxs);
 	const auto ZA = Xcom;
+
+	hpx::wait_all (futs);
+
 	if (leaf) {
+		std::vector < hpx::future<std::vector<vect>> > part_futs;
 		std::vector < hpx::id_type > direct;
-		ncfuts.clear();
+		{
+			PROFILE();
+			opened.clear();
 //		printf( "Getting masses\n");
-		for (int i = 0; i < checklist.size(); i++) {
-			const auto tmp = futs[i].get();
-			const auto rmaxB = tmp.radius;
-			const auto ZB = tmp.com;
-			real sep;
-			if (opts.ewald) {
-				sep = ewald_separation(ZA - ZB);
-			} else {
-				sep = abs(ZA - ZB);
-			}
-			if (sep > (rmaxA + rmaxB) / theta) {
-				source s;
-				s.m = tmp.mtot;
-				s.x = tmp.com;
-				sources.push_back(s);
-			} else if (tmp.leaf) {
-				direct.push_back(checklist[i]);
-			} else {
-				ncfuts.push_back(hpx::async < get_children_action > (checklist[i]));
-			}
-		}
-
-		checklist.clear();
-		for (auto &f : ncfuts) {
-			const auto tmp = f.get();
-			checklist.insert(checklist.end(), tmp.begin(), tmp.end());
-		}
-
-		std::vector < hpx::future<std::vector<vect>> > gfuts(direct.size());
-		for (int i = 0; i < direct.size(); i++) {
-			gfuts[i] = hpx::async < get_gravity_particles_action > (direct[i]);
-		}
-		hpx::wait_all (gfuts);
-		for (auto &n : gfuts) {
-			auto pj = n.get();
-			for (const auto &x : pj) {
-				source s;
-				s.m = m;
-				s.x = x;
-				sources.push_back(s);
-			}
-		}
-		if (checklist.size()) {
-			hpx::async < compute_gravity_action > (self, checklist, std::move(sources), t, dt).get();
-		} else {
-			std::vector<vect> activeX;
-			activeX.reserve(parts.size());
-			for (auto &p : parts) {
-				if (p.t + p.dt == t + dt) {
-					activeX.push_back(p.x);
+			for (int i = 0; i < checklist.size(); i++) {
+				const auto tmp = futs[i].get();
+				const auto rmaxB = tmp.radius;
+				const auto ZB = tmp.com;
+				real sep;
+				if (opts.ewald) {
+					sep = ewald_separation(ZA - ZB);
+				} else {
+					sep = abs(ZA - ZB);
+				}
+				if (sep > (rmaxA + rmaxB) / theta) {
+					source s;
+					s.m = tmp.mtot;
+					s.x = tmp.com;
+					sources.push_back(s);
+				} else if (tmp.leaf) {
+					direct.push_back(checklist[i]);
+				} else {
+					opened.push_back(hpx::async < get_children_action > (checklist[i]));
 				}
 			}
-			auto g = direct_gravity(activeX, sources);
-			if (opts.ewald) {
-				const auto ge = ewald_gravity(activeX, ewald_sources);
-				for (int i = 0; i < g.size(); i++) {
-					g[i].g = g[i].g + ge[i].g;
-					g[i].phi = g[i].phi + ge[i].phi;
+		}
+		hpx::wait_all (opened);
+		{
+			PROFILE();
+			checklist.clear();
+			for (auto &f : opened) {
+				const auto tmp = f.get();
+				checklist.insert(checklist.end(), tmp.begin(), tmp.end());
+			}
+			part_futs.resize(direct.size());
+			for (int i = 0; i < direct.size(); i++) {
+				part_futs[i] = hpx::async < get_gravity_particles_action > (direct[i]);
+			}
+		}
+		hpx::wait_all (part_futs);
+		{
+			PROFILE();
+			for (auto &n : part_futs) {
+				auto pj = n.get();
+				for (const auto &x : pj) {
+					source s;
+					s.m = m;
+					s.x = x;
+					sources.push_back(s);
 				}
 			}
-			int j = 0;
-			for (auto &p : parts) {
-				if (p.t + p.dt == t + dt) {
-					p.g = g[j].g;
-					p.phi = g[j].phi;
-					j++;
-					p.v = p.v + p.g * real_type(p.dt) * 0.5;
-					p.t += p.dt;
-					p.dt = fixed_real::max();
-					const auto a = abs(p.g);
-					if (a > 0.0) {
-						const real this_dt = sqrt(h / a);
-						if (this_dt < (double) fixed_real::max()) {
-							p.dt = double(min(p.dt, fixed_real(this_dt.get())));
-						}
+			if (checklist.size()) {
+				compute_gravity_action()(self, checklist, std::move(sources), t, dt);
+			} else {
+				std::vector<vect> activeX;
+				activeX.reserve(parts.size());
+				for (auto &p : parts) {
+					if (p.t + p.dt == t + dt) {
+						activeX.push_back(p.x);
 					}
-					p.dt *= opts.cfl;
-					p.dt = p.dt.nearest_log2();
-					p.dt = min(p.dt, (t + dt).next_bin() - (t + dt));
-					tmin = min(tmin, p.dt);
-					p.v = p.v + p.g * real_type(p.dt) * 0.5;
+				}
+				auto g = direct_gravity(activeX, sources);
+				if (opts.ewald) {
+					const auto ge = ewald_gravity(activeX, ewald_sources);
+					for (int i = 0; i < g.size(); i++) {
+						g[i].g = g[i].g + ge[i].g;
+						g[i].phi = g[i].phi + ge[i].phi;
+					}
+				}
+				int j = 0;
+				for (auto &p : parts) {
+					if (p.t + p.dt == t + dt) {
+						p.g = g[j].g;
+						p.phi = g[j].phi;
+						j++;
+						p.v = p.v + p.g * real_type(p.dt) * 0.5;
+						p.t += p.dt;
+						p.dt = fixed_real::max();
+						const auto a = abs(p.g);
+						if (a > 0.0) {
+							const real this_dt = sqrt(h / a);
+							if (this_dt < (double) fixed_real::max()) {
+								p.dt = double(min(p.dt, fixed_real(this_dt.get())));
+							}
+						}
+						p.dt *= opts.cfl;
+						p.dt = p.dt.nearest_log2();
+						p.dt = min(p.dt, (t + dt).next_bin() - (t + dt));
+						tmin = min(tmin, p.dt);
+						p.v = p.v + p.g * real_type(p.dt) * 0.5;
+					}
 				}
 			}
 		}
 	} else {
-		std::vector < hpx::id_type > leaf_nids;
-		for (int i = 0; i < checklist.size(); i++) {
-			const auto tmp = futs[i].get();
-			const auto rmaxB = tmp.radius;
-			const auto ZB = tmp.com;
-			real sep;
-			if (opts.ewald) {
-				sep = ewald_separation(ZA - ZB);
-			} else {
-				sep = abs(ZA - ZB);
-			}
-			//		printf( "%e\n", sep);
-			if (sep > (rmaxA + rmaxB) / theta) {
-				source s;
-				s.m = tmp.mtot;
-				s.x = tmp.com;
-				sources.push_back(s);
-			} else if (tmp.leaf) {
-				leaf_nids.push_back(checklist[i]);
-			} else {
-				ncfuts.push_back(hpx::async < get_children_action > (checklist[i]));
-			}
-		}
-		checklist.clear();
-		checklist.insert(checklist.end(), leaf_nids.begin(), leaf_nids.end());
-		for (auto &c : ncfuts) {
-			const auto tmp = c.get();
-			checklist.insert(checklist.end(), tmp.begin(), tmp.end());
-		}
 		std::array<hpx::future<fixed_real>, NCHILD> cfuts;
+		{
+			PROFILE();
+			std::vector < hpx::id_type > leaf_nids;
+			for (int i = 0; i < checklist.size(); i++) {
+				const auto tmp = futs[i].get();
+				const auto rmaxB = tmp.radius;
+				const auto ZB = tmp.com;
+				real sep;
+				if (opts.ewald) {
+					sep = ewald_separation(ZA - ZB);
+				} else {
+					sep = abs(ZA - ZB);
+				}
+				//		printf( "%e\n", sep);
+				if (sep > (rmaxA + rmaxB) / theta) {
+					source s;
+					s.m = tmp.mtot;
+					s.x = tmp.com;
+					sources.push_back(s);
+				} else if (tmp.leaf) {
+					leaf_nids.push_back(checklist[i]);
+				} else {
+					opened.push_back(hpx::async < get_children_action > (checklist[i]));
+				}
+			}
+			checklist.clear();
+			checklist.insert(checklist.end(), leaf_nids.begin(), leaf_nids.end());
+		}
+		hpx::wait_all(opened);
+		{
+			PROFILE();
+			for (auto &c : opened) {
+				const auto tmp = c.get();
+				checklist.insert(checklist.end(), tmp.begin(), tmp.end());
+			}
+		}
 		for (int ci = 0; ci < NCHILD; ci++) {
 			if (tree_id_level(id) < 6) {
 				cfuts[ci] = hpx::async([this, ci, t, dt](std::vector<hpx::id_type> checklist, std::vector<source> sources) {
@@ -255,8 +273,11 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, std::vecto
 			}
 		}
 		hpx::wait_all(cfuts);
-		for (int ci = 0; ci < NCHILD; ci++) {
-			tmin = min(tmin, cfuts[ci].get());
+		{
+			PROFILE();
+			for (int ci = 0; ci < NCHILD; ci++) {
+				tmin = min(tmin, cfuts[ci].get());
+			}
 		}
 	}
 	return tmin;

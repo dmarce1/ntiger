@@ -27,7 +27,6 @@ void tree::compute_drift(fixed_real dt) {
 	if (leaf) {
 		list<particle> parent_parts;
 		{
-			PROFILE();
 			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 			int sz = parts.size();
 

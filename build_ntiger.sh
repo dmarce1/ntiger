@@ -19,7 +19,7 @@ cmake -DCMAKE_PREFIX_PATH="$HOME/local/$1/hpx" -DCMAKE_CXX_FLAGS="-DBOOST_USE_VA
       -DCMAKE_CXX_COMPILER=g++  \
 -DPAPI_LIBRARY="/work/dmarce1/PowerTiger/build/papi/lib/libpapi.a"\
       -DCMAKE_C_COMPILER=gcc \
-      -DCMAKE_CXX_FLAGS="-pg" \
+      -DCMAKE_CXX_FLAGS="" \
       -DCMAKE_C_FLAGS="" \
       -DCMAKE_BUILD_TYPE=$1                                                                                                                            \
       -DCMAKE_INSTALL_PREFIX="$HOME/local/$1/octotiger"                                   \

@@ -82,7 +82,7 @@ void set_cuda_ewald_tables(const std::array<ewald_table_t, NDIM> &f, const ewald
 __global__
 
 
-        __global__
+         __global__
 void direct_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *y, int xsize, int ysize, real h, bool ewald) {
 	__shared__ gravity
 	this_g[P];
@@ -155,8 +155,6 @@ void direct_gravity_kernel(gravity *__restrict__ g, const vect *x, const source 
 __global__
 void ewald_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *y, int xsize, int ysize, real h) {
 
-
-
 	__shared__ gravity
 	this_g[P];
 	const real dxbininv = (EWALD_NBIN << 1);                                   // 1 OP
@@ -173,14 +171,14 @@ void ewald_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *
 		auto x0 = dx;
 		vect sgn(1.0);
 #pragma loop unroll 3
-			for (int dim = 0; dim < NDIM; dim++) {
-				if (x0[dim] < 0.0) {
-					x0[dim] = -x0[dim];                         // 3 * 1 OP
-					sgn[dim] *= -1.0;                           // 3 * 1 OP
-				}
-				if (x0[dim] > 0.5) {
-					x0[dim] = 1.0 - x0[dim];                   // 3 * 1 OP
-					sgn[dim] *= -1.0;                          // 3 * 1 OP
+		for (int dim = 0; dim < NDIM; dim++) {
+			if (x0[dim] < 0.0) {
+				x0[dim] = -x0[dim];                         // 3 * 1 OP
+				sgn[dim] *= -1.0;                           // 3 * 1 OP
+			}
+			if (x0[dim] > 0.5) {
+				x0[dim] = 1.0 - x0[dim];                   // 3 * 1 OP
+				sgn[dim] *= -1.0;                          // 3 * 1 OP
 			}
 		}
 		const real r2 = x0.dot(x0);
@@ -216,13 +214,19 @@ void ewald_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *
 	g[i].g = this_g[0].g; // 1 OP
 	g[i].phi = this_g[0].phi; // 1 OP
 
-
 }
 
 std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::vector<source> &y) {
 //	printf( "<-\n" );
 	std::vector<gravity> g(x.size());
 	double start, stop;
+	static thread_local cudaStream_t stream;
+	static thread_local bool stream_created = false;
+	if (!stream_created) {
+		stream_created = true;
+		cudaStreamCreate(&stream);
+	}
+
 	if (x.size() > 0 && y.size() > 0) {
 		bool ewald = options::get().ewald;
 		real h = options::get().kernel_size;
@@ -250,13 +254,10 @@ std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::
 		if (true) {
 			start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 		}
-		cudaStream_t stream;
-		cudaStreamCreate(&stream);
 		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
-		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
+			CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
 		direct_gravity_kernel<<<x.size(),P,0,stream>>>(cg,cx,cy,x.size(),y.size(), h, ewald);
-		CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
-		cudaStreamDestroy(stream);
+				CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
 
 		if (true) {
 			static double last_display = 0.0;
@@ -266,7 +267,7 @@ std::vector<gravity> direct_gravity_cuda(const std::vector<vect> &x, const std::
 			t += stop - start;
 			flops += x.size() * y.size() * 35;
 			//	if (t > 0.0) {
-			if (t > last_display + 1.0e-2) {
+			if (t > last_display + 1.0) {
 				printf("DIRECT %e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
 				last_display = t;
 			}
@@ -282,6 +283,12 @@ std::vector<gravity> ewald_gravity_cuda(const std::vector<vect> &x, const std::v
 //	printf( "<-\n" );
 	std::vector<gravity> g(x.size());
 	double start, stop;
+	static thread_local cudaStream_t stream;
+	static thread_local bool stream_created = false;
+	if (!stream_created) {
+		stream_created = true;
+		cudaStreamCreate(&stream);
+	}
 	if (x.size() > 0 && y.size() > 0) {
 		bool ewald = options::get().ewald;
 		real h = options::get().kernel_size;
@@ -309,13 +316,10 @@ std::vector<gravity> ewald_gravity_cuda(const std::vector<vect> &x, const std::v
 		if (true) {
 			start = std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 		}
-		cudaStream_t stream;
-		cudaStreamCreate(&stream);
 		CUDA_CHECK(cudaMemcpy(cx, x.data(), x.size() * sizeof(vect), cudaMemcpyHostToDevice));
 		CUDA_CHECK(cudaMemcpy(cy, y.data(), y.size() * sizeof(source), cudaMemcpyHostToDevice));
-		ewald_gravity_kernel<<<x.size(), P,0,stream>>>(cg,cx,cy,x.size(),y.size(), h);
-		CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
-		cudaStreamDestroy(stream);
+ewald_gravity_kernel<<<x.size(), P,0,stream>>>(cg,cx,cy,x.size(),y.size(), h);
+				CUDA_CHECK(cudaMemcpy(g.data(), cg, x.size() * sizeof(gravity), cudaMemcpyDeviceToHost));
 
 		if (true) {
 			static double last_display = 0.0;

@@ -4,8 +4,8 @@
 #include <ntiger/rand.hpp>
 
 
-list<particle> cosmos(int cnt) {
-	list<particle> parts;
+std::vector<particle> cosmos(int cnt) {
+	std::vector<particle> parts;
 	for (int i = 0; i < cnt; i++) {
 		vect x;
 		for( int dim = 0; dim < NDIM; dim++) {
@@ -15,13 +15,13 @@ list<particle> cosmos(int cnt) {
 		p.v = vect(0);
 		p.x = x;
 		p.t = p.dt = 0.0;
-		parts.push_front(p);
+		parts.push_back(p);
 	}
 
 	return parts;
 }
 
-list<particle> get_initial_particles(const std::string &name, int cnt) {
+std::vector<particle> get_initial_particles(const std::string &name, int cnt) {
 	if (false) {
 	} else if (name == "cosmos") {
 		return cosmos(cnt);

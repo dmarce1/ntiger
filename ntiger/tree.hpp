@@ -8,7 +8,6 @@
 #ifndef TREE_SERVER_CPP_
 #define TREE_SERVER_CPP_
 
-#include <ntiger/list.hpp>
 #include <ntiger/particle.hpp>
 #include <ntiger/range.hpp>
 #include <ntiger/fixed_real.hpp>
@@ -76,7 +75,7 @@ struct monopole_attr {     // 28
 
 class tree: public hpx::components::component_base<tree>  { // 196
 	tree_id id;
-	list<particle> parts;								// 16
+	std::vector<particle> parts;								// 16
 	std::array<node_attr, NCHILD> children;				// 64
 	std::array<int, NCHILD> child_loads;				// 8
 	hpx::id_type parent;                                // 8
@@ -99,9 +98,9 @@ public:
 	static void set_ewald_sources(std::vector<source>);
 
 	tree();
-	tree(tree_id id, const list<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads, const range &_box,
+	tree(tree_id id, const std::vector<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads, const range &_box,
 			bool _leaf);
-	tree(tree_id id, list<particle>&&, const range&);
+	tree(tree_id id, std::vector<particle>&&, const range&);
 
 	void apply_boost(vect);
 	mass_attr compute_mass_attributes();
@@ -111,8 +110,8 @@ public:
 	void compute_interactions();
 	int compute_workload();
 	void create_children();
-	list<particle> destroy();
-	void find_home(const list<particle>&);
+	std::vector<particle> destroy();
+	void find_home(const std::vector<particle>&);
 	tree_attr finish_drift();
 	tree_attr get_attributes() const;
 	std::array<hpx::id_type, NCHILD> get_children() const;
@@ -121,7 +120,7 @@ public:
 	hpx::id_type get_parent() const;
 	void rescale(real factor, range mybox);
 	void redistribute_workload(int, int);
-	void send_particles(const list<particle>&);
+	void send_particles(const std::vector<particle>&);
 	void set_self_and_parent(const hpx::id_type, const hpx::id_type);
 	tree_stats tree_statistics() const;
 	void keplerize();

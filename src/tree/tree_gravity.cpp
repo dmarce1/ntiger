@@ -171,7 +171,6 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, pinned_vec
 		}
 		hpx::wait_all (part_futs);
 		{
-			PROFILE();
 			for (auto &n : part_futs) {
 				auto pj = n.get();
 				for (const auto &x : pj) {

@@ -25,7 +25,7 @@ void tree::apply_boost(vect x) {
 void tree::compute_drift(fixed_real dt) {
 	static const auto opts = options::get();
 	if (leaf) {
-		list<particle> parent_parts;
+		std::vector<particle> parent_parts;
 		{
 			std::lock_guard < hpx::lcos::local::mutex > lock(*mtx);
 			int sz = parts.size();
@@ -38,11 +38,12 @@ void tree::compute_drift(fixed_real dt) {
 				if (opts.ewald) {
 					pi.x = ewald_location(pi.x);
 				}
-				i++;
 				if (!in_range(pi.x, box)) {
-					parent_parts.push_front(pi);
-					std::swap(parts.front(), pi);
-					parts.pop_front();
+					parent_parts.push_back(pi);
+					std::swap(parts.back(), pi);
+					parts.pop_back();
+				} else {
+					i++;
 				}
 			}
 		}

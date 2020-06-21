@@ -21,7 +21,6 @@ HPX_REGISTER_COMPONENT(hpx::components::component<tree>, tree);
 
 pinned_vector<source> tree::ewald_sources;
 
-
 hpx::lcos::local::spinlock tree::thread_mtx;
 int tree::thread_cnt = 1;
 
@@ -249,6 +248,9 @@ tree_attr tree::finish_drift() {
 			leaf = true;
 		}
 	}
+//	decltype(parts) tmp(parts.size());
+//	tmp = parts;
+//	parts = std::move(tmp);
 	return get_attributes();
 }
 

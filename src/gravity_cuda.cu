@@ -83,7 +83,7 @@ void set_cuda_ewald_tables(const std::array<ewald_table_t, NDIM> &f, const ewald
 __global__
 
 
-               __global__
+                __global__
 void direct_gravity_kernel(gravity *__restrict__ g, const vect *x, const source *y, int xsize, int ysize, real h, bool ewald) {
 	__shared__ gravity
 	this_g[P];
@@ -246,11 +246,20 @@ context pop_context(std::size_t xs, std::size_t ys) {
 	context ctx = contexts.top();
 	contexts.pop();
 	if (ctx.xsize < xs) {
+		printf("X %li\n", xs);
+		if (ctx.x != nullptr) {
+			CUDA_CHECK(cudaFree((void* )ctx.x));
+			CUDA_CHECK(cudaFree((void* )ctx.g));
+		}
 		CUDA_CHECK(cudaMalloc((void** ) &ctx.g, sizeof(gravity) * xs));
 		CUDA_CHECK(cudaMalloc((void** ) &ctx.x, sizeof(vect) * xs));
 		ctx.xsize = xs;
 	}
 	if (ctx.ysize < ys) {
+		printf("Y %li\n", ys);
+		if (ctx.y != nullptr) {
+			CUDA_CHECK(cudaFree((void* )ctx.y));
+		}
 		CUDA_CHECK(cudaMalloc((void** ) &ctx.y, sizeof(source) * ys));
 		ctx.ysize = ys;
 	}
@@ -350,7 +359,7 @@ pinned_vector<gravity> ewald_gravity_cuda(const pinned_vector<vect> &x, const pi
 			t += stop - start;
 			flops += x.size() * y.size() * 100.0;
 			if (t > last_display + 1.0) {
-	//			printf("%e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
+				//			printf("%e TFLOPS\n", flops / 1024.0 / 1024.0 / 1024.0 / t / 1024.0);
 				last_display = t;
 			}
 

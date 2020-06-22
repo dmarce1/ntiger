@@ -11,14 +11,14 @@
 #include <ntiger/particle.hpp>
 #include <ntiger/range.hpp>
 #include <ntiger/fixed_real.hpp>
+#include <ntiger/checkitem.hpp>
 
 #include <hpx/include/components.hpp>
-#include <hpx/runtime/components/server/migrate_component.hpp>
 
 #include <ntiger/gravity.hpp>
 #include <ntiger/tree_id.hpp>
 #include <ntiger/tree_stats.hpp>
-
+#include <ntiger/monopole.hpp>
 
 struct tree_attr {
 	bool leaf;
@@ -37,10 +37,12 @@ struct tree_attr {
 struct node_attr {
 	hpx::id_type id;
 	range box;
+	checkitem check;
 	template<class Arc>
 	void serialize(Arc &&arc, unsigned) {
 		arc & id;
 		arc & box;
+		arc & check;
 	}
 };
 
@@ -58,22 +60,7 @@ struct mass_attr {     // 28
 	}
 };
 
-
-struct monopole_attr {     // 28
-	vect com;           // 12
-	real mtot;          //  4
-	real radius;         // 4
-	bool leaf;
-	template<class Arc>
-	void serialize(Arc &&arc, unsigned) {
-		arc & com;
-		arc & mtot;
-		arc & radius;
-		arc & leaf;
-	}
-};
-
-class tree: public hpx::components::component_base<tree>  { // 196
+class tree: public hpx::components::component_base<tree> { // 196
 	tree_id id;
 	std::vector<particle> parts;								// 16
 	std::array<node_attr, NCHILD> children;				// 64
@@ -97,11 +84,10 @@ class tree: public hpx::components::component_base<tree>  { // 196
 public:
 	static void set_ewald_sources(std::vector<source>);
 
-	tree();
-	tree(tree_id id, const std::vector<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads, const range &_box,
-			bool _leaf);
+	tree(tree_id id, const std::vector<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads,
+			const range &_box, bool _leaf);
 	tree(tree_id id, std::vector<particle>&&, const range&);
-
+	~tree();
 	void apply_boost(vect);
 	mass_attr compute_mass_attributes();
 	void compute_drift(fixed_real);
@@ -115,6 +101,7 @@ public:
 	tree_attr finish_drift();
 	tree_attr get_attributes() const;
 	std::array<hpx::id_type, NCHILD> get_children() const;
+	std::array<checkitem, NCHILD> open_check() const;
 	pinned_vector<vect> get_gravity_particles() const;
 	monopole_attr get_monopole_attributes() const;
 	hpx::id_type get_parent() const;
@@ -128,24 +115,9 @@ public:
 	void write_checkpoint(const std::string&, fixed_real) const;
 	void write_silo(int, fixed_real) const;
 	hpx::id_type migrate(const hpx::id_type&);
+	std::pair<std::uint64_t, int> get_local_pointer();
 
-	template<class Arc>
-	void serialize(Arc &&arc, unsigned) {
-		arc & id;
-		arc & parts;
-		arc & children;
-		arc & child_loads;
-		arc & parent;
-		arc & self;
-		arc & box;
-		arc & leaf;
-		arc & dead;
-		arc & Xcom;
-		arc & mtot;
-		arc & rmaxs;
-		arc & rmaxb;
-	}
-
+	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_local_pointer);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,apply_boost);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_mass_attributes);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_drift);
@@ -170,6 +142,7 @@ public:
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_monopole_attributes);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_parent);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_children);
+	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,open_check);
 	/***/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,send_particles);
 
 };

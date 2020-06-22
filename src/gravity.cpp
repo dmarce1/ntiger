@@ -6,6 +6,11 @@
 
 #include <cassert>
 
+
+void yield_to_hpx() {
+	hpx::this_thread::yield();
+}
+
 using vect_int =
 general_vect<int, NDIM>;
 real EW(general_vect<double, NDIM>);

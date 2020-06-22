@@ -2,6 +2,7 @@
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
 #include <ntiger/tree.hpp>
+#include <ntiger/checkitem.hpp>
 
 #include  <hpx/lcos/when_all.hpp>
 #include <hpx/lcos/local/mutex.hpp>
@@ -57,13 +58,6 @@ void tree::set_ewald_sources(std::vector<source> s) {
 	}
 }
 
-tree::tree() {
-	mtx = std::make_shared<hpx::lcos::local::mutex>();
-	dead = false;
-	leaf = false;
-	id = 1;
-}
-
 tree::tree(tree_id id_, const std::vector<particle> &_parts, const std::array<node_attr, NCHILD> &_children, const std::array<int, NCHILD> &_child_loads,
 		const range &_box, bool _leaf) {
 	id = id_;
@@ -98,6 +92,15 @@ tree::tree(tree_id id_, std::vector<particle> &&these_parts, const range &box_) 
 		leaf = true;
 		parts = std::move(these_parts);
 	}
+}
+
+tree::~tree() {
+}
+
+std::pair<std::uint64_t,int> tree::get_local_pointer() {
+	std::pair<std::uint64_t,int> rc;
+	rc.first = reinterpret_cast<std::uint64_t>(this);
+	rc.second = hpx::get_locality_id();
 }
 
 int tree::compute_workload() {
@@ -154,6 +157,8 @@ void tree::create_children() {
 	auto fr = hpx::new_ < tree > (hpx::find_here(), tree_id_child_right(id), std::move(pr), boxr);
 	children[0].id = fl.get();
 	children[1].id = fr.get();
+	children[0].check = checkitem(children[0].id);
+	children[1].check = checkitem(children[1].id);
 }
 
 std::vector<particle> tree::destroy() {
@@ -241,6 +246,7 @@ tree_attr tree::finish_drift() {
 			for (int ci = 0; ci < NCHILD; ci++) {
 				const auto tmp = dfuts[ci].get();
 				children[ci].id = hpx::invalid_id;
+				children[ci].check = checkitem();
 				for (auto &p : tmp) {
 					parts.push_back(p);
 				}
@@ -267,6 +273,14 @@ std::array<hpx::id_type, NCHILD> tree::get_children() const {
 	std::array < hpx::id_type, NCHILD > cids;
 	for (int ci = 0; ci < NCHILD; ci++) {
 		cids[ci] = children[ci].id;
+	}
+	return cids;
+}
+
+std::array<checkitem, NCHILD> tree::open_check() const {
+	std::array < checkitem, NCHILD > cids;
+	for (int ci = 0; ci < NCHILD; ci++) {
+		cids[ci] = children[ci].check;
 	}
 	return cids;
 }
@@ -324,6 +338,7 @@ void tree::redistribute_workload(int current, int total) {
 			assert(loc_id < localities.size());
 			if (localities[loc_id] != hpx::find_here()) {
 				children[ci].id = migrate_action()(children[ci].id, localities[loc_id]);
+				children[ci].check = checkitem(children[ci].id);
 			}
 			futs[ci] = hpx::async < redistribute_workload_action > (children[ci].id, current, total);
 			current += child_loads[ci];

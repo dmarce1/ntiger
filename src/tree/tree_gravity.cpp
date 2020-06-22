@@ -111,21 +111,20 @@ monopole_attr tree::get_monopole_attributes() const {
 	return mono;
 }
 
-fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, pinned_vector<source> sources, fixed_real t, fixed_real dt) {
+fixed_real tree::compute_gravity(std::vector<checkitem> checklist, pinned_vector<source> sources, fixed_real t, fixed_real dt) {
 	const static auto opts = options::get();
 	const auto theta = opts.theta;
 	const auto h = options::get().kernel_size;
 	const auto m = 1.0 / options::get().problem_size;
 	fixed_real tmin = fixed_real::max();
-	std::vector < hpx::future < monopole_attr >> futs;
+	std::vector < monopole_attr > monos;
 	std::vector < hpx::future<std::array<hpx::id_type, NCHILD>> > opened;
 	for (const auto &n : checklist) {
-		futs.push_back(hpx::async < get_monopole_attributes_action > (n));
+		monos.push_back(n.get_monopole());
 	}
 	const auto rmaxA = min(rmaxb, rmaxs);
 	const auto ZA = Xcom;
 
-	hpx::wait_all (futs);
 
 	if (leaf) {
 		std::vector < hpx::future<pinned_vector<vect>> > part_futs;
@@ -135,7 +134,7 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, pinned_vec
 			opened.clear();
 //		printf( "Getting masses\n");
 			for (int i = 0; i < checklist.size(); i++) {
-				const auto tmp = futs[i].get();
+				const auto tmp = monos[i];
 				const auto rmaxB = tmp.radius;
 				const auto ZB = tmp.com;
 				real sep;
@@ -150,9 +149,9 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, pinned_vec
 					s.x = tmp.com;
 					sources.push_back(s);
 				} else if (tmp.leaf) {
-					direct.push_back(checklist[i]);
+					direct.push_back(checklist[i].get_gid());
 				} else {
-					opened.push_back(hpx::async < get_children_action > (checklist[i]));
+					opened.push_back(hpx::async < get_children_action > (checklist[i].get_gid()));
 				}
 			}
 		}
@@ -228,7 +227,7 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, pinned_vec
 			PROFILE();
 			std::vector < hpx::id_type > leaf_nids;
 			for (int i = 0; i < checklist.size(); i++) {
-				const auto tmp = futs[i].get();
+				const auto tmp = monos[i];
 				const auto rmaxB = tmp.radius;
 				const auto ZB = tmp.com;
 				real sep;
@@ -244,9 +243,9 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, pinned_vec
 					s.x = tmp.com;
 					sources.push_back(s);
 				} else if (tmp.leaf) {
-					leaf_nids.push_back(checklist[i]);
+					leaf_nids.push_back(checklist[i].get_gid());
 				} else {
-					opened.push_back(hpx::async < get_children_action > (checklist[i]));
+					opened.push_back(hpx::async < get_children_action > (checklist[i].get_gid()));
 				}
 			}
 			checklist.clear();
@@ -263,7 +262,7 @@ fixed_real tree::compute_gravity(std::vector<hpx::id_type> checklist, pinned_vec
 		auto tmps = sources;
 		for (int ci = 0; ci < NCHILD; ci++) {
 			if (inc_thread()) {
-				cfuts[ci] = hpx::async([this, ci, t, dt](std::vector<hpx::id_type> checklist, pinned_vector<source> sources) {
+				cfuts[ci] = hpx::async([this, ci, t, dt](std::vector<checkitem> checklist, pinned_vector<source> sources) {
 					auto tmp = compute_gravity_action()(children[ci].id, checklist, std::move(sources), t, dt);
 					dec_thread();
 					return tmp;

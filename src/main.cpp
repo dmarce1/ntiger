@@ -4,6 +4,7 @@
 #include <ntiger/options.hpp>
 #include <ntiger/profiler.hpp>
 #include <ntiger/tree.hpp>
+#include <ntiger/checkitem.hpp>
 
 hpx::id_type root;
 
@@ -13,7 +14,7 @@ fixed_real solve_gravity(fixed_real t, fixed_real dt) {
 	if (opts.ewald) {
 		tree::set_ewald_sources(tree::gather_ewald_sources_action()(root));
 	}
-	return tree::compute_gravity_action()(root, std::vector < hpx::id_type > (1, root), pinned_vector<source>(), t, dt);
+	return tree::compute_gravity_action()(root, std::vector < checkitem > (1, checkitem(root)), pinned_vector<source>(), t, dt);
 }
 
 void drift(fixed_real t, fixed_real dt) {

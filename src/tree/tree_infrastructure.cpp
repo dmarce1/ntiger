@@ -101,6 +101,7 @@ std::pair<std::uint64_t,int> tree::get_local_pointer() {
 	std::pair<std::uint64_t,int> rc;
 	rc.first = reinterpret_cast<std::uint64_t>(this);
 	rc.second = hpx::get_locality_id();
+	return rc;
 }
 
 int tree::compute_workload() {
